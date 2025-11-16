@@ -9,10 +9,11 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-     http: ^1.0.0 # Để gọi API (giao tiếp với Backend)
-    provider: ^6.0.0 # (Hoặc riverpod) Dùng để quản lý State (trạng thái)
-    flutter_secure_storage: ^9.0.0 # Để lưu JWT Token an toàn
-
+    
+# Add these if you plan to connect to Django later:
+  http: ^1.1.0
+  provider: ^6.0.0
+  flutter_secure_storage: ^9.0.0 # Để lưu JWT Token an toàn
 
 dev_dependencies:
   flutter_test:
