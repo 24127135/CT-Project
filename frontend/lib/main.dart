@@ -1,8 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'providers/trip_provider.dart';
 import 'screens/login_screen.dart';
 
 void main() {
-  runApp(const MyApp());
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => TripProvider()),
+      ],
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -14,7 +23,6 @@ class MyApp extends StatelessWidget {
       title: 'Trek Guide',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        // Using the forest green from the home screen as the primary seed color
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFF425E3C),
           primary: const Color(0xFF425E3C),
