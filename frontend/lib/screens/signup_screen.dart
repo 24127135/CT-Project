@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/gestures.dart'; // Dùng cho TapGestureRecognizer
+import 'package:flutter/gestures.dart';
+import 'login_screen.dart';
+import 'otp_verification_screen.dart';
+
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -135,7 +138,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 height: 56,
                 child: ElevatedButton(
                   onPressed: () {
-                    // Logic đăng ký sẽ nằm ở đây
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const OtpVerificationScreen(),
+                      ),
+                    );
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: primaryGreen,
@@ -173,8 +181,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
                         ),
                         recognizer: TapGestureRecognizer()
                           ..onTap = () {
-                            // Điều hướng sang trang Đăng nhập
-                            // Navigator.push(context, MaterialPageRoute(builder: (_) => LoginView()));
+                            
+                            Navigator.push(context, MaterialPageRoute(builder: (_) => LoginScreen()));
                           },
                       ),
                     ],
