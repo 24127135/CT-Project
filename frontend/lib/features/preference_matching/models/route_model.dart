@@ -45,9 +45,35 @@ class RouteModel {
       distanceKm: (json['totalDistanceKm'] ?? 0).toDouble(),
       elevationGainM: (json['elevationGainM'] ?? 0).toInt(),
 
-      // Backend chưa gửi thời gian, tạm tính hoặc để mặc định
-      durationDays: 2,
-      durationNights: 1,
+      // Backend chưa gửi thời gian, cố gắng lấy từ backend hoặc tính toán từ startDate/endDate nếu có
+      durationDays: json['durationDays'] ??
+          (() {
+            if (json['startDate'] != null && json['endDate'] != null) {
+              try {
+                final start = DateTime.parse(json['startDate']);
+                final end = DateTime.parse(json['endDate']);
+                final days = end.difference(start).inDays;
+                return days > 0 ? days : 2;
+              } catch (e) {
+                return 2;
+              }
+            }
+            return 2;
+          })(),
+      durationNights: json['durationNights'] ??
+          (() {
+            if (json['startDate'] != null && json['endDate'] != null) {
+              try {
+                final start = DateTime.parse(json['startDate']);
+                final end = DateTime.parse(json['endDate']);
+                final nights = end.difference(start).inDays;
+                return nights > 0 ? nights - 1 : 1;
+              } catch (e) {
+                return 1;
+              }
+            }
+            return 1;
+          })(),
 
       // Lấy tags từ backend gán vào địa hình
       terrain: (json['tags'] as List?)?.join(', ') ?? 'Đồi núi',
