@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'features/home/screen/home_view.dart';
 import 'package:provider/provider.dart';
 import 'providers/trip_provider.dart';
-import 'screens/login_screen.dart';
+
 
 void main() {
   runApp(
@@ -15,7 +16,7 @@ void main() {
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({Key? key}) : super(key: key);
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -31,7 +32,7 @@ class MyApp extends StatelessWidget {
         fontFamily: 'Roboto',
         useMaterial3: true,
       ),
-      home: const LoginScreen(),
+      home: const HomeView(),
     );
   }
 }

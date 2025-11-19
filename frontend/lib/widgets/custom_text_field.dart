@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../utils/app_colors.dart';
+import 'package:frontend/utils/app_colors.dart';
+import 'package:frontend/utils/app_styles.dart';
 
 class CustomTextField extends StatelessWidget {
   final String hintText;
@@ -8,12 +9,12 @@ class CustomTextField extends StatelessWidget {
   final TextInputType? keyboardType;
 
   const CustomTextField({
-    Key? key,
+    super.key,
     required this.hintText,
     this.controller,
     this.obscureText = false,
     this.keyboardType,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -21,22 +22,23 @@ class CustomTextField extends StatelessWidget {
       controller: controller,
       obscureText: obscureText,
       keyboardType: keyboardType,
+      style: AppStyles.bodyText, // Use bodyText style for input
       decoration: InputDecoration(
         hintText: hintText,
-        hintStyle: TextStyle(color: Colors.grey[400]),
+        hintStyle: AppStyles.hintText, // Use hintText style
         filled: true,
-        fillColor: Colors.white,
+        fillColor: AppColors.white,
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
           borderSide: const BorderSide(
             color: AppColors.borderGreen,
-            width: 2,
+            width: 1.5,
           ),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
           borderSide: const BorderSide(
-            color: AppColors.borderGreen,
+            color: AppColors.primaryGreen,
             width: 2,
           ),
         ),
