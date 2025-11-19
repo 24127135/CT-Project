@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-$5xm=s0*ut_cm9y5ijcb=x+7dfow$v+e68w0q-ev!l2l4wxsy*
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['10.0.2.2', 'localhost', '127.0.0.1'] 
 
 
 # Application definition
@@ -89,10 +89,10 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'trekguide_db',
-        'USER': 'postgres',
-        'PASSWORD': 'fivepointcrew',
-        'HOST': 'localhost',         # Địa chỉ máy chủ cơ sở dữ liệu
-        'PORT': '5432',              # Cổng mặc định của PostgreSQL
+        'USER': 'trekadmin',
+        'PASSWORD': 'fivepointcrew',  # <--- UPDATE THIS to match your SQL
+        'HOST': 'localhost',
+        'PORT': '5432',
     }
 }
 

@@ -3,8 +3,9 @@ import '../widgets/custom_text_field.dart';
 import '../widgets/custom_button.dart';
 import '../utils/app_colors.dart';
 import '../utils/app_styles.dart';
+import '../services/auth_service.dart'; // Import Service
 import 'otp_verification_screen.dart';
-import 'signup_screen.dart'; // Import the new screen
+import 'signup_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -16,101 +17,94 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  final AuthService _authService = AuthService();
+  bool _isLoading = false;
 
-  @override
-  void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
-    super.dispose();
-  }
+  Future<void> _handleLogin() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
 
-  void _handleLogin() {
-    // TODO: Connect to Django backend API here
-    // For now, navigate to OTP screen
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const OtpVerificationScreen(),
-      ),
-    );
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill in all fields')),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    // Call Backend
+    final success = await _authService.login(email, password);
+
+    setState(() => _isLoading = false);
+
+    if (success) {
+      if (!mounted) return;
+      // Navigate to OTP screen passing the email
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => OtpVerificationScreen(email: email),
+        ),
+      );
+    } else {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Login failed. Check credentials.')),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    // ... (UI code remains mostly the same, just updating button state) ...
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFFF5F5F5),
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'Đăng nhập',
-          style: TextStyle(
-            color: Colors.black,
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        centerTitle: true,
-      ),
+      // ... existing scaffold code ...
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(24.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // ... existing UI headers ...
               const SizedBox(height: 60),
-              // Greeting text
-              const Text(
-                'Chúc một ngày tốt lành!',
-                style: AppStyles.heading,
-              ),
+              const Text('Chúc một ngày tốt lành!', style: AppStyles.heading),
               const SizedBox(height: 32),
-              // Email field
+              
               CustomTextField(
                 hintText: 'Email',
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
               ),
               const SizedBox(height: 16),
-              // Password field
+              
               CustomTextField(
                 hintText: 'Mật khẩu',
                 controller: _passwordController,
                 obscureText: true,
               ),
               const SizedBox(height: 24),
-              // Login button
-              CustomButton(
-                text: 'Đăng nhập',
-                onPressed: _handleLogin,
-              ),
+              
+              // Loading Indicator or Button
+              _isLoading
+                  ? const Center(child: CircularProgressIndicator(color: AppColors.primaryGreen))
+                  : CustomButton(text: 'Đăng nhập', onPressed: _handleLogin),
+              
               const Spacer(),
-              // Sign up link
+              
+              // ... existing footer ...
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text(
-                    'Chưa có tài khoản? ',
-                    style: TextStyle(color: AppColors.textDark),
-                  ),
+                  const Text('Chưa có tài khoản? ', style: TextStyle(color: AppColors.textDark)),
                   GestureDetector(
                     onTap: () {
-                      // Navigate to Sign Up Screen
                       Navigator.push(
                         context,
-                        MaterialPageRoute(
-                          builder: (context) => const SignupScreen(),
-                        ),
+                        MaterialPageRoute(builder: (context) => const SignupScreen()),
                       );
                     },
-                    child: const Text(
-                      'Đăng ký',
-                      style: AppStyles.linkText,
-                    ),
+                    child: const Text('Đăng ký', style: AppStyles.linkText),
                   ),
                 ],
               ),

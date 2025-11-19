@@ -7,14 +7,13 @@ class CustomUserManager(BaseUserManager):
             raise ValueError('The Email must be set')
         email = self.normalize_email(email)
         user = self.model(email=email, **extra_fields)
-        user.set_password(password) # Hash mật khẩu
+        user.set_password(password)
         user.save(using=self._db)
         return user
 
     def create_superuser(self, email, password=None, **extra_fields):
         extra_fields.setdefault('is_staff', True)
         extra_fields.setdefault('is_superuser', True)
-        # ... (kiểm tra lỗi) ...
         return self.create_user(email, password, **extra_fields)
 
 class User(AbstractBaseUser, PermissionsMixin):
@@ -23,12 +22,14 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
     preferences = models.TextField(blank=True, null=True)
+    
+    # --- ADDED OTP FIELDS ---
+    otp = models.CharField(max_length=6, blank=True, null=True)
+    otp_created_at = models.DateTimeField(blank=True, null=True)
 
     objects = CustomUserManager()
-    USERNAME_FIELD = 'email' # Trường dùng để đăng nhập
+    USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['full_name']
 
     def __str__(self):
         return self.email
-
-

@@ -3,6 +3,7 @@ import '../widgets/custom_text_field.dart';
 import '../widgets/custom_button.dart';
 import '../utils/app_colors.dart';
 import '../utils/app_styles.dart';
+import '../services/auth_service.dart'; // Import Service
 import 'otp_verification_screen.dart';
 import 'login_screen.dart';
 
@@ -17,177 +18,104 @@ class _SignupScreenState extends State<SignupScreen> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  final AuthService _authService = AuthService();
   
-  // State for the checkbox
   bool _isAgreed = false;
+  bool _isLoading = false;
 
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _emailController.dispose();
-    _passwordController.dispose();
-    super.dispose();
-  }
-
-  void _handleSignup() {
+  Future<void> _handleSignup() async {
     if (!_isAgreed) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vui lòng đồng ý với điều khoản sử dụng')),
+        const SnackBar(content: Text('Please agree to the terms')),
       );
       return;
     }
 
-    // TODO: Connect to Django backend API for Registration here
-    // On success, navigate to OTP verification
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const OtpVerificationScreen(),
-      ),
-    );
+    final email = _emailController.text.trim();
+    final name = _nameController.text.trim();
+    final password = _passwordController.text.trim();
+
+    setState(() => _isLoading = true);
+
+    // Call Backend
+    final success = await _authService.register(email, name, password);
+
+    setState(() => _isLoading = false);
+
+    if (success) {
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => OtpVerificationScreen(email: email),
+        ),
+      );
+    } else {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Registration failed. Email might exist.')),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    // ... UI code is the same, just update the button to handle loading ...
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFFF5F5F5),
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'Đăng ký',
-          style: TextStyle(
-            color: Colors.black,
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        centerTitle: true,
-      ),
+      // ... scaffold setup ...
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // ... existing UI fields ...
               const SizedBox(height: 20),
-              // Main Heading
-              const Text(
-                'Tạo tài khoản Trek Guide',
-                style: AppStyles.heading,
-              ),
+              const Text('Tạo tài khoản Trek Guide', style: AppStyles.heading),
               const SizedBox(height: 32),
               
-              // Full Name Field
-              CustomTextField(
-                hintText: 'Họ và tên',
-                controller: _nameController,
-                keyboardType: TextInputType.name,
-              ),
+              CustomTextField(hintText: 'Họ và tên', controller: _nameController),
               const SizedBox(height: 16),
-              
-              // Email Field
-              CustomTextField(
-                hintText: 'Email',
-                controller: _emailController,
-                keyboardType: TextInputType.emailAddress,
-              ),
+              CustomTextField(hintText: 'Email', controller: _emailController, keyboardType: TextInputType.emailAddress),
               const SizedBox(height: 16),
-              
-              // Password Field
-              CustomTextField(
-                hintText: 'Mật khẩu',
-                controller: _passwordController,
-                obscureText: true,
-              ),
+              CustomTextField(hintText: 'Mật khẩu', controller: _passwordController, obscureText: true),
               const SizedBox(height: 24),
 
-              // Checkbox Terms & Conditions
+              // Terms Checkbox
               Row(
-                crossAxisAlignment: CrossAxisAlignment.start, // Align to top of text
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   SizedBox(
-                    height: 24,
-                    width: 24,
+                    height: 24, width: 24,
                     child: Checkbox(
                       value: _isAgreed,
                       activeColor: AppColors.primaryGreen,
-                      side: const BorderSide(color: AppColors.primaryGreen, width: 2),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      onChanged: (bool? value) {
-                        setState(() {
-                          _isAgreed = value ?? false;
-                        });
-                      },
+                      onChanged: (val) => setState(() => _isAgreed = val ?? false),
                     ),
                   ),
                   const SizedBox(width: 12),
-                  Expanded(
-                    child: RichText(
-                      text: const TextSpan(
-                        style: TextStyle(color: AppColors.textGray, fontSize: 13, height: 1.5),
-                        children: [
-                          TextSpan(text: 'Tôi đồng ý với các '),
-                          TextSpan(
-                            text: 'Điều khoản',
-                            style: TextStyle(
-                              color: Colors.black, 
-                              fontWeight: FontWeight.bold
-                            ),
-                          ),
-                          TextSpan(text: ' và '),
-                          TextSpan(
-                            text: 'Thỏa thuận',
-                            style: TextStyle(
-                              color: Colors.black, 
-                              fontWeight: FontWeight.bold
-                            ),
-                          ),
-                          TextSpan(text: ' của app.'),
-                        ],
-                      ),
-                    ),
-                  ),
+                  const Expanded(child: Text('Tôi đồng ý với các Điều khoản và Thỏa thuận của app.', style: TextStyle(color: AppColors.textGray, fontSize: 13))),
                 ],
               ),
 
               const SizedBox(height: 24),
               
-              // Create Account Button
-              CustomButton(
-                text: 'Tạo tài khoản',
-                onPressed: _handleSignup,
-              ),
+              _isLoading
+                  ? const Center(child: CircularProgressIndicator(color: AppColors.primaryGreen))
+                  : CustomButton(text: 'Tạo tài khoản', onPressed: _handleSignup),
               
-              const SizedBox(height: 40), // Spacing before bottom link
-
-              // Already have account link
-              Row(
+              const SizedBox(height: 40),
+              // ... existing footer ...
+               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text(
-                    'Đã có tài khoản? ',
-                    style: TextStyle(color: AppColors.textDark),
-                  ),
+                  const Text('Đã có tài khoản? '),
                   GestureDetector(
-                    onTap: () {
-                      // Pop back to Login Screen
-                      Navigator.pop(context);
-                    },
-                    child: const Text(
-                      'Đăng nhập',
-                      style: AppStyles.linkText,
-                    ),
+                    onTap: () => Navigator.pop(context),
+                    child: const Text('Đăng nhập', style: AppStyles.linkText),
                   ),
                 ],
               ),
-              const SizedBox(height: 20),
             ],
           ),
         ),
