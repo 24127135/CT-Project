@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'features/home/screen/home_view.dart';
+import 'screens/welcome_view.dart';
 import 'package:provider/provider.dart';
 import 'providers/trip_provider.dart';
 
@@ -32,7 +32,7 @@ class MyApp extends StatelessWidget {
         fontFamily: 'Roboto',
         useMaterial3: true,
       ),
-      home: const HomeView(),
+      home: const WelcomeView(),
     );
   }
 }
