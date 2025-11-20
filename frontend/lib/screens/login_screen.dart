@@ -1,14 +1,16 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import '../widgets/custom_text_field.dart';
 import '../widgets/custom_button.dart';
 import '../utils/app_colors.dart';
 import '../utils/app_styles.dart';
 import '../services/auth_service.dart'; // Import Service
+import '../features/home/screen/home_view.dart';
 import 'otp_verification_screen.dart';
 import 'signup_screen.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({Key? key}) : super(key: key);
+  const LoginScreen({super.key});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -106,10 +108,33 @@ class _LoginScreenState extends State<LoginScreen> {
                     },
                     child: const Text('Đăng ký', style: AppStyles.linkText),
                   ),
-                ],
-              ),
-              const SizedBox(height: 20),
-            ],
+                ),
+                const SizedBox(height: 24),
+                CustomButton(
+                  text: 'Đăng nhập',
+                  onPressed: _handleLogin,
+                ),
+                const Spacer(), // Pushes the footer content to the bottom
+                RichText(
+                  textAlign: TextAlign.center,
+                  text: TextSpan(
+                    style: AppStyles.bodyText,
+                    children: <TextSpan>[
+                      const TextSpan(text: 'Chưa có tài khoản? '),
+                      TextSpan(
+                        text: 'Đăng ký',
+                        style: AppStyles.linkText,
+                        recognizer: TapGestureRecognizer()
+                          ..onTap = () {
+                            // TODO: Navigate to sign up screen
+                          },
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+              ],
+            ),
           ),
         ),
       ),

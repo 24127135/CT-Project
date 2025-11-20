@@ -50,9 +50,8 @@ INSTALLED_APPS = [
     # Local apps
     'users',
     'routes',
-    'plans',
+    'plan',
     'safety',
-
 
 ]
 
@@ -89,6 +88,17 @@ WSGI_APPLICATION = 'trek_guide_project.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.postgresql',
+#         'NAME': 'trekguide_db',
+#         'USER': 'postgres',
+#         'PASSWORD': 'fivepointcrew',
+#         'HOST': 'localhost',         # Địa chỉ máy chủ cơ sở dữ liệu
+#         'PORT': '5432',              # Cổng mặc định của PostgreSQL
+#     }
+# }
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
@@ -99,7 +109,6 @@ DATABASES = {
         'PORT': os.getenv('DB_PORT', '5432'),
     }
 }
-
 # Custom user model
 AUTH_USER_MODEL = 'users.User'
 

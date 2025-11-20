@@ -21,7 +21,21 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^5.0.0
+  flutter_lints: ^6.0.0
+  calendar_date_picker2: ^1.1.4
+
+  # Launcher icon generator
+  flutter_launcher_icons: ^0.11.0
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/icon/app_icon.png
+
+# Configuration for flutter_launcher_icons. After adding your source
+# icon at `assets/icon/app_icon.png`, run:
+#   flutter pub get
+#   flutter pub run flutter_launcher_icons:main
+flutter_icons:
+  android: true
+  image_path: "assets/icon/app_icon.png"

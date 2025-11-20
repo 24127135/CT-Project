@@ -15,7 +15,7 @@ class RouteSuggestionView(generics.ListAPIView):
     danh sách các Routes phù hợp.
     """
     serializer_class = RouteSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
 
     # def get_queryset(self):
     #     # 1. Lấy dữ liệu từ query params (gửi từ frontend)

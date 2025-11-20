@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'trip_info_screen.dart'; // Import the Trip Info Screen (Step 1)
+import 'tripinfopart1.dart'; // Import the Trip Info Screen (Step 1)
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
