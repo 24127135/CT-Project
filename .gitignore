@@ -20,13 +20,13 @@ Thumbs.db
 /backend/*.pyc
 /backend/__pycache__/
 /backend/*.egg-info/
-backend/*.egg
+/backend/*.egg
 /__pycache__/ 
 *.pyc
 
 # Secrets
 /backend/.env
-/backend/*.env.*
+#/backend/*.env.*
 /backend/*.ini
 
 # ############################
