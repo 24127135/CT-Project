@@ -99,7 +99,7 @@ class WelcomeView extends StatelessWidget {
                   height: 56,
                   child: ElevatedButton(
                     onPressed: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (context) => SignUpScreen()));
+                      Navigator.push(context, MaterialPageRoute(builder: (context) => SignupScreen()));
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF56AB2F), // Màu xanh lá tươi

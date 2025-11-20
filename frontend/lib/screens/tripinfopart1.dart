@@ -11,21 +11,45 @@ class TripInfoScreen extends StatefulWidget {
 }
 
 class _TripInfoScreenState extends State<TripInfoScreen> {
-  //  dùng dữ liệu từ Provider
-
   final Color primaryGreen = const Color(0xFF4CAF50);
   final Color darkGreen = const Color(0xFF388E3C);
 
+  // 1. Define Controller here
+  late TextEditingController _locationController;
+
+  @override
+  void initState() {
+    super.initState();
+    // 2. Initialize controller ONCE with data from Provider
+    final tripData = context.read<TripProvider>();
+    _locationController = TextEditingController(text: tripData.searchLocation);
+  }
+
+  @override
+  void dispose() {
+    // 3. Dispose controller to free memory
+    _locationController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
-    // 3. Lắng nghe dữ liệu từ Provider (Dùng context.watch để UI tự vẽ lại khi dữ liệu đổi)
     final tripData = context.watch<TripProvider>();
+
+    // Optional: If the provider updates from elsewhere (reset), sync the controller
+    if (_locationController.text != tripData.searchLocation) {
+       _locationController.text = tripData.searchLocation;
+       // Keep cursor at end to prevent jumping if updated externally
+       _locationController.selection = TextSelection.fromPosition(
+           TextPosition(offset: _locationController.text.length)
+       );
+    }
 
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () {},
+          onPressed: () => Navigator.pop(context),
         ),
         title: const Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -51,8 +75,10 @@ class _TripInfoScreenState extends State<TripInfoScreen> {
 
               // Ô nhập địa điểm
               TextField(
-                // Khi nhập, lưu ngay vào Provider
+                // 4. Use the persistent controller
+                controller: _locationController,
                 onChanged: (value) {
+                  // Only update provider, DO NOT recreate controller
                   context.read<TripProvider>().setSearchLocation(value);
                 },
                 decoration: InputDecoration(
@@ -65,8 +91,6 @@ class _TripInfoScreenState extends State<TripInfoScreen> {
                   filled: true,
                   fillColor: Colors.grey.shade200,
                 ),
-                // Nếu muốn hiển thị lại giá trị cũ khi quay lại trang này:
-                controller: TextEditingController(text: tripData.searchLocation),
               ),
 
               const SizedBox(height: 24),
@@ -74,11 +98,10 @@ class _TripInfoScreenState extends State<TripInfoScreen> {
               const Text('Loại hình nghỉ ngơi', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 12),
 
-              // Các nút chọn Loại hình (Dùng tripData.accommodation để kiểm tra)
               _buildChoiceButton(
                 label: 'Cắm trại',
-                isSelected: tripData.accommodation == 'Cắm trại', // <--- Kiểm tra từ Provider
-                onTap: () => context.read<TripProvider>().setAccommodation('Cắm trại'), // <--- Lưu vào Provider
+                isSelected: tripData.accommodation == 'Cắm trại',
+                onTap: () => context.read<TripProvider>().setAccommodation('Cắm trại'),
               ),
               const SizedBox(height: 12),
               _buildChoiceButton(
@@ -98,7 +121,6 @@ class _TripInfoScreenState extends State<TripInfoScreen> {
               const Text('Số người đi cùng', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 12),
 
-              // Các nút chọn Số người (Dùng tripData.paxGroup để kiểm tra)
               _buildChoiceButton(
                 label: 'Đơn lẻ (1-2 người)',
                 isSelected: tripData.paxGroup == 'Đơn lẻ (1-2 người)',
@@ -124,7 +146,6 @@ class _TripInfoScreenState extends State<TripInfoScreen> {
         padding: const EdgeInsets.all(16.0),
         child: ElevatedButton(
           onPressed: () {
-            // Kiểm tra xem đã chọn đủ chưa (Validation đơn giản)
             if (tripData.accommodation == null || tripData.paxGroup == null) {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Vui lòng chọn đủ thông tin!'), backgroundColor: Colors.red),
