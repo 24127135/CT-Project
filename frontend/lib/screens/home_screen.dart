@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
-import 'tripinfopart1.dart'; // Import the Trip Info Screen (Step 1)
+import 'tripinfopart1.dart'; // Step 1
+import 'trip_list.dart'; // Trip List Screen
+import 'fast_input.dart' as fast_input; // Fast Input Screen
+
+const kBgColor = Color(0xFFF8F6F2);
+const kForestGreen = Color(0xFF425E3C);
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -9,304 +14,339 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  // State to track if the "Plan" card is expanded
   bool _isPlanExpanded = false;
-
-  // Define the Green Color from the design
-  final Color _forestGreen = const Color(0xFF425E3C);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Column(
-        children: [
-          // 1. HEADER SECTION
-          Expanded(
-            flex: 4,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                // Green Background Top
-                Container(
-                  color: _forestGreen,
-                  alignment: Alignment.topCenter,
-                  padding: const EdgeInsets.only(top: 60),
-                  child: Text(
-                    "HOME PAGE",
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.w900, // Extra bold to match ArchivoBlack
-                      color: Colors.white.withOpacity(0.9),
-                      letterSpacing: 1.5,
+      backgroundColor: kBgColor,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: Column(
+            children: [
+              // ====== HEADER GREEN + TITLE + DOT ======
+              Container(
+                width: double.infinity,
+                color: kForestGreen,
+                padding: const EdgeInsets.only(top: 16, bottom: 12),
+                child: Column(
+                  children: [
+                    const SizedBox(height: 4),
+                    // chấm đen
+                    const CircleAvatar(
+                      radius: 16,
+                      backgroundColor: Colors.black,
                     ),
-                  ),
-                ),
-                // Image Overlay
-                Positioned(
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  height: 200,
-                  child: Container(
-                    decoration: const BoxDecoration(
-                      image: DecorationImage(
-                        // Using a placeholder mountain image
-                        image: NetworkImage(
-                            'https://images.unsplash.com/photo-1506617524003-b71686086a0b?q=80&w=1000&auto=format&fit=crop'),
-                        fit: BoxFit.cover,
+                    const SizedBox(height: 16),
+                    Text(
+                      'HOME PAGE',
+                      style: TextStyle(
+                        fontSize: 30,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 4,
+                        color: Colors.white.withOpacity(0.95),
+                        shadows: const [
+                          Shadow(
+                            offset: Offset(0, 3),
+                            blurRadius: 4,
+                            color: Colors.black38,
+                          )
+                        ],
                       ),
                     ),
-                    child: Container(
-                      // Gradient to make text readable
+                    const SizedBox(height: 4),
+                  ],
+                ),
+              ),
+
+              // ====== HERO IMAGE ======
+              SizedBox(
+                height: 180,
+                width: double.infinity,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Image.asset(
+                      'assets/images/sm_vuon_quoc_gia_bach_ma_ec2642a14c.jpg',
+                      fit: BoxFit.cover,
+                    ),
+                    // nhẹ gradient cho dễ đọc text
+                    Container(
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
                           colors: [
-                            Colors.transparent,
-                            Colors.black.withOpacity(0.6),
+                            Colors.black.withOpacity(0.0),
+                            Colors.black.withOpacity(0.55),
                           ],
                         ),
                       ),
-                      padding: const EdgeInsets.all(20),
-                      alignment: Alignment.bottomLeft,
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 24, vertical: 16),
                       child: Column(
-                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.end,
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            "Khám phá thiên nhiên Việt Nam",
+                        children: const [
+                          Text(
+                            'Khám phá thiên nhiên Việt Nam',
                             style: TextStyle(
                               color: Colors.white70,
                               fontSize: 14,
+                              fontStyle: FontStyle.italic,
                             ),
                           ),
-                          const SizedBox(height: 4),
-                          const Text(
-                            "Hãy bắt đầu hành trình",
+                          SizedBox(height: 4),
+                          Text(
+                            'Hãy bắt đầu hành trình',
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 20,
-                              fontWeight: FontWeight.bold,
+                              fontWeight: FontWeight.w700,
                               fontStyle: FontStyle.italic,
                             ),
                           ),
                         ],
                       ),
                     ),
-                  ),
+                  ],
                 ),
-              ],
-            ),
-          ),
+              ),
 
-          // 2. BODY SECTION
-          Expanded(
-            flex: 6,
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-              child: Column(
-                children: [
-                  // Card 1: Lên kế hoạch (Expandable)
-                  GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _isPlanExpanded = !_isPlanExpanded;
-                      });
-                    },
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 300),
-                      decoration: BoxDecoration(
-                        color: _isPlanExpanded ? _forestGreen : Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
-                            blurRadius: 10,
-                            offset: const Offset(0, 5),
-                          )
-                        ],
-                      ),
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                        children: [
-                          // Top part of card (Always visible)
-                          _buildCardContent(
-                            icon: Icons.map_outlined,
-                            title: "Lên kế hoạch",
-                            subtitle: "Nhập thông tin chuyến đi mới",
-                            isDarkBg: _isPlanExpanded,
+              const SizedBox(height: 24),
+
+              // ====== BODY CARDS ======
+              Padding(
+                padding:
+                const EdgeInsets.symmetric(horizontal: 20.0, vertical: 0),
+                child: Column(
+                  children: [
+                    // CARD 1 – LÊN KẾ HOẠCH (expand)
+                    GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _isPlanExpanded = !_isPlanExpanded;
+                        });
+                      },
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 250),
+                        padding: const EdgeInsets.all(18),
+                        margin: const EdgeInsets.only(bottom: 20),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(26),
+                          border: Border.all(
+                            color: kForestGreen,
+                            width: 1.1,
                           ),
-                          
-                          // Expanded Content (Buttons)
-                          if (_isPlanExpanded) ...[
-                            const SizedBox(height: 20),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: _buildActionButton(
-                                    "Tạo mới",
-                                    onTap: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          // Navigating to Step 1 (TripInfoScreen)
-                                          builder: (context) => const TripInfoScreen(),
-                                        ),
-                                      );
-                                    },
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.08),
+                              blurRadius: 14,
+                              offset: const Offset(0, 6),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          children: [
+                            _buildCardContent(
+                              icon: Icons.map_outlined,
+                              title: 'Lên kế hoạch',
+                              subtitle: 'Nhập thông tin chuyến đi mới',
+                            ),
+                            if (_isPlanExpanded) ...[
+                              const SizedBox(height: 16),
+                              const Divider(
+                                  height: 1, color: Color(0xFFE0DED6)),
+                              const SizedBox(height: 16),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _buildActionButton(
+                                      'Tạo mới',
+                                      onTap: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                            const TripInfoScreen(),
+                                          ),
+                                        );
+                                      },
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(width: 15),
-                                Expanded(
-                                  child: _buildActionButton(
-                                    "Nhập nhanh",
-                                    onTap: () {
-                                      // Placeholder for "Nhập nhanh" action
-                                      print("Nhập nhanh pressed");
-                                    },
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: _buildActionButton(
+                                      'Nhập nhanh',
+                                      onTap: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                                fast_input.TripListView(),
+                                          ),
+                                        );
+                                      },
+                                    ),
                                   ),
-                                ),
-                              ],
-                            )
-                          ]
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  // Card 2: Chuyến đi đã tạo
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 10,
-                          offset: const Offset(0, 5),
-                        )
-                      ],
-                    ),
-                    padding: const EdgeInsets.all(20),
-                    child: _buildCardContent(
-                      icon: Icons.receipt_long_outlined,
-                      title: "Chuyến đi đã tạo",
-                      subtitle: "Xem các kế hoạch đã lưu",
-                      isDarkBg: false,
-                    ),
-                  ),
-
-                  const SizedBox(height: 40),
-
-                  // Footer Tip
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(Icons.lightbulb_outline,
-                          color: Colors.yellow[700], size: 20),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: RichText(
-                          text: TextSpan(
-                            style: TextStyle(
-                                color: Colors.grey[600], fontSize: 13),
-                            children: const [
-                              TextSpan(
-                                text: "Mẹo: ",
-                                style: TextStyle(fontWeight: FontWeight.bold),
+                                ],
                               ),
-                              TextSpan(
-                                text:
-                                    "Luôn kiểm tra thời tiết và chuẩn bị đầy đủ trang thiết bị trước khi lên đường!",
-                              ),
-                            ],
-                          ),
+                            ]
+                          ],
                         ),
                       ),
-                    ],
-                  ),
-                ],
+                    ),
+
+                    // CARD 2 – CHUYẾN ĐI ĐÃ TẠO
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => TripListView(),
+                          ),
+                        );
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(18),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(26),
+                          border: Border.all(
+                            color: const Color(0xFF9CA493), // viền nhạt hơn
+                            width: 1,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.06),
+                              blurRadius: 12,
+                              offset: const Offset(0, 5),
+                            ),
+                          ],
+                        ),
+                        child: _buildCardContent(
+                          icon: Icons.receipt_long_outlined,
+                          title: 'Chuyến đi đã tạo',
+                          subtitle: 'Xem các kế hoạch đã lưu',
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 40),
+
+                    // FOOTER TIP
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          '💡',
+                          style: TextStyle(fontSize: 18),
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: RichText(
+                            text: const TextSpan(
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: kForestGreen,
+                              ),
+                              children: [
+                                TextSpan(
+                                  text: 'Mẹo: ',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                TextSpan(
+                                  text:
+                                  'Luôn kiểm tra thời tiết và chuẩn bị đầy đủ trang thiết bị trước khi lên đường!',
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                  ],
+                ),
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
 
-  // Helper to build the content inside the main cards
+  // Nội dung 2 card chính
   Widget _buildCardContent({
     required IconData icon,
     required String title,
     required String subtitle,
-    required bool isDarkBg,
   }) {
-    return Container(
-        decoration: BoxDecoration(
-            color: isDarkBg ? Colors.white : Colors.transparent,
-            borderRadius: BorderRadius.circular(15)
-        ),
-        padding: isDarkBg ? const EdgeInsets.all(15) : EdgeInsets.zero,
-        child: Row(
+    return Row(
       children: [
         Container(
-          width: 50,
-          height: 50,
+          width: 64,
+          height: 64,
           decoration: BoxDecoration(
-            color: _forestGreen,
-            borderRadius: BorderRadius.circular(12),
+            color: kForestGreen,
+            borderRadius: BorderRadius.circular(18),
           ),
-          child: Icon(icon, color: Colors.white, size: 28),
+          child: Icon(icon, color: Colors.white, size: 30),
         ),
-        const SizedBox(width: 15),
+        const SizedBox(width: 18),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 title,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: _forestGreen,
+                  fontWeight: FontWeight.w700,
+                  color: kForestGreen,
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 6),
               Text(
                 subtitle,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 13,
-                  color: Colors.grey[500],
+                  color: Color(0xFF9A978F),
                 ),
               ),
             ],
           ),
         ),
       ],
-    ));
+    );
   }
 
-  // Helper for the white buttons inside the expanded green card
-  // Updated to accept an onTap callback
+  // Nút trắng trong card 1 khi expand
   Widget _buildActionButton(String text, {VoidCallback? onTap}) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        height: 50,
+        height: 46,
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: kForestGreen.withOpacity(0.6),
+            width: 1,
+          ),
         ),
         child: Text(
           text,
-          style: TextStyle(
-            color: _forestGreen,
-            fontWeight: FontWeight.bold,
-            fontSize: 16,
+          style: const TextStyle(
+            color: kForestGreen,
+            fontWeight: FontWeight.w700,
+            fontSize: 15,
           ),
         ),
       ),

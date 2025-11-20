@@ -30,6 +30,11 @@ flutter:
   uses-material-design: true
   assets:
     - assets/icon/app_icon.png
+    - assets/images/33Muidoihondau01.jpg
+    - assets/images/dia-chi-pu-luong.jpg
+    - assets/images/image.jpg
+    - assets/images/sm_vuon_quoc_gia_bach_ma_ec2642a14c.jpg
+    - assets/images/image 24.png
 
 # Configuration for flutter_launcher_icons. After adding your source
 # icon at `assets/icon/app_icon.png`, run:
