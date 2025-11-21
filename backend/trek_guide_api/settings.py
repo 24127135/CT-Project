@@ -25,12 +25,17 @@ SECRET_KEY = 'django-insecure-9vjb-_=o$o-y2%q#*8dfmf4ea+#b^jndf!pfml1wf$!fqv!*on
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    '192.168.0.12',  # <-- IP BẠN VỪA BỊ LỖI
+    'localhost',
+    '127.0.0.1',
+]
 
 
 # Application definition
 
 INSTALLED_APPS = [
+    'corsheaders',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -45,6 +50,7 @@ INSTALLED_APPS = [
     # Local Apps
 
     'users',
+    'plan',
 ]
 
 AUTH_USER_MODEL = 'users.User'
@@ -52,6 +58,7 @@ AUTH_USER_MODEL = 'users.User'
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -157,3 +164,5 @@ REST_FRAMEWORK = {
         'djangorestframework_camel_case.parser.CamelCaseJSONParser',
     ),
 }
+
+CORS_ALLOW_ALL_ORIGINS = True
