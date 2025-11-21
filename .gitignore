@@ -1,7 +1,14 @@
 # ############################
 # ## GENERAL / OS / IDE
 # ############################
+**/__pycache__/
 
+# Ignore specific frontend files often managed by package managers/IDEs
+frontend/.metadata
+frontend/pubspec.lock
+
+# Ignore test directories that don't need to be committed
+frontend/test/
 # Operating System files
 .DS_Store
 Thumbs.db
