@@ -73,6 +73,8 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
     }
   }
 
+  // ... imports remain the same ...
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -88,62 +90,65 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
         centerTitle: true,
       ),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            children: [
-              const SizedBox(height: 60),
-              const Text('Xác thực tài khoản', style: AppStyles.heading),
-              const SizedBox(height: 8),
-              Text(
-                'Nhập mã xác thực OTP chúng tôi đã gửi về:\n${widget.email}',
-                textAlign: TextAlign.center,
-                style: AppStyles.subheading,
-              ),
-              const SizedBox(height: 32),
-              
-              // OTP Fields
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: List.generate(4, (index) {
-                  return SizedBox(
-                    width: 60, height: 60,
-                    child: TextField(
-                      controller: _otpControllers[index],
-                      focusNode: _focusNodes[index],
-                      textAlign: TextAlign.center,
-                      keyboardType: TextInputType.number,
-                      maxLength: 1,
-                      style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      decoration: InputDecoration(
-                        counterText: '',
-                        filled: true,
-                        fillColor: Colors.white,
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: AppColors.borderGreen, width: 2),
+        // WRAP IN SingleChildScrollView
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              children: [
+                const SizedBox(height: 60),
+                const Text('Xác thực tài khoản', style: AppStyles.heading),
+                const SizedBox(height: 8),
+                Text(
+                  'Nhập mã xác thực OTP chúng tôi đã gửi về:\n${widget.email}',
+                  textAlign: TextAlign.center,
+                  style: AppStyles.subheading,
+                ),
+                const SizedBox(height: 32),
+                
+                // OTP Fields
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: List.generate(4, (index) {
+                    return SizedBox(
+                      width: 60, height: 60,
+                      child: TextField(
+                        controller: _otpControllers[index],
+                        focusNode: _focusNodes[index],
+                        textAlign: TextAlign.center,
+                        keyboardType: TextInputType.number,
+                        maxLength: 1,
+                        style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                        decoration: InputDecoration(
+                          counterText: '',
+                          filled: true,
+                          fillColor: Colors.white,
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(color: AppColors.borderGreen, width: 2),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(color: AppColors.borderGreen, width: 2),
+                          ),
                         ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: AppColors.borderGreen, width: 2),
-                        ),
+                        onChanged: (value) {
+                          if (value.isNotEmpty && index < 3) _focusNodes[index + 1].requestFocus();
+                          if (value.isEmpty && index > 0) _focusNodes[index - 1].requestFocus();
+                        },
                       ),
-                      onChanged: (value) {
-                        if (value.isNotEmpty && index < 3) _focusNodes[index + 1].requestFocus();
-                        if (value.isEmpty && index > 0) _focusNodes[index - 1].requestFocus();
-                      },
-                    ),
-                  );
-                }),
-              ),
-              const SizedBox(height: 32),
-              
-              // Verify Button
-              _isLoading 
-                  ? const CircularProgressIndicator(color: AppColors.primaryGreen)
-                  : CustomButton(text: 'Xác nhận', onPressed: _handleVerification),
-            ],
+                    );
+                  }),
+                ),
+                const SizedBox(height: 32),
+                
+                // Verify Button
+                _isLoading 
+                    ? const CircularProgressIndicator(color: AppColors.primaryGreen)
+                    : CustomButton(text: 'Xác nhận', onPressed: _handleVerification),
+              ],
+            ),
           ),
         ),
       ),

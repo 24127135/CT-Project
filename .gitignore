@@ -1,8 +1,15 @@
-#############################
-# OS / Editor / IDE
-#############################
+# ############################
+# ## GENERAL / OS / IDE
+# ############################
+**/__pycache__/
 
-# macOS
+# Ignore specific frontend files often managed by package managers/IDEs
+frontend/.metadata
+frontend/pubspec.lock
+
+# Ignore test directories that don't need to be committed
+frontend/test/
+# Operating System files
 .DS_Store
 
 # Windows
@@ -23,7 +30,6 @@ desktop.ini
 # vim
 *.swp
 
-<<<<<<< HEAD
 # Path is specified as /backend/
 /backend/venv/
 /backend/*.pyc
@@ -37,7 +43,6 @@ desktop.ini
 /backend/.env
 #/backend/*.env.*
 /backend/*.ini
-=======
 #############################
 # Python / Django
 #############################
@@ -46,7 +51,6 @@ desktop.ini
 __pycache__/
 *.py[cod]
 *$py.class
->>>>>>> TripInfo
 
 # Distribution / packaging
 *.egg-info/
@@ -118,6 +122,8 @@ backend/*.env.*
 /frontend/ios/Flutter/App.framework
 /frontend/ios/Flutter/engine.framework
 /frontend/ios/Flutter/Flutter.podspec
+<<<<<<< HEAD
+=======
 =======
 /build/
 **/build/
@@ -193,3 +199,4 @@ secret_key*
 # Ignore any database in project root or subfolders
 *.db
 >>>>>>> TripInfo
+>>>>>>> 2a1ae0086ee58b6ff0f39518e46deb3bce07d91a
