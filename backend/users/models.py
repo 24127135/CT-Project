@@ -23,7 +23,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_staff = models.BooleanField(default=False)
     preferences = models.TextField(blank=True, null=True)
     
-    # --- ADDED OTP FIELDS ---
+    # --- OTP FIELDS ---
     otp = models.CharField(max_length=6, blank=True, null=True)
     otp_created_at = models.DateTimeField(blank=True, null=True)
 
@@ -33,3 +33,38 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self):
         return self.email
+
+
+# --- NEW MODEL: FAST INPUT TEMPLATES ---
+class TripTemplate(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='templates')
+    
+    # The name user gives in Step 5 (must be unique per user)
+    name = models.CharField(max_length=255)
+    
+    # Step 1 Data
+    location = models.CharField(max_length=255)
+    accommodation = models.CharField(max_length=100) # e.g., "Cắm trại", "Homestay"
+    pax_group = models.CharField(max_length=100)     # e.g., "Nhóm nhỏ (3-6 người)"
+    
+    # Step 2 Data (We store duration, not specific dates, as templates are reused)
+    duration_days = models.IntegerField(default=1) 
+    
+    # Step 3 Data
+    difficulty = models.CharField(max_length=100)    # e.g., "Người mới"
+    
+    # Step 4 Data
+    note = models.TextField(blank=True, null=True)
+    # We store interests as a list of strings using JSONField
+    # NOTE: SQLite supports JSON, PostgreSQL is even better.
+    interests = models.JSONField(default=list, blank=True) 
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        # Ensures one user cannot have two templates with the same name
+        unique_together = ('user', 'name')
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.name} - {self.user.email}"

@@ -1,10 +1,11 @@
 from django.urls import path
-from .views import RegisterView, LoginView, VerifyOTPView
-from rest_framework_simplejwt.views import TokenRefreshView
+from .views import RegisterView, LoginView, VerifyOTPView, TripTemplateListCreateView
 
 urlpatterns = [
-    path('register/', RegisterView.as_view(), name='user-register'),
+    path('register/', RegisterView.as_view(), name='register'),
     path('login/', LoginView.as_view(), name='login'),
     path('verify-otp/', VerifyOTPView.as_view(), name='verify-otp'),
-    path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    
+    # New Endpoint for Fast Input
+    path('templates/', TripTemplateListCreateView.as_view(), name='trip-templates'),
 ]
