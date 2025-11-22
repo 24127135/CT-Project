@@ -98,6 +98,21 @@ class TripProvider with ChangeNotifier {
     return date.toIso8601String().split('T')[0];
   }
 
+  // --- HÀM RESET DỮ LIỆU (Dọn dẹp để tạo chuyến đi mới) ---
+  void resetTrip() {
+    searchLocation = '';
+    accommodation = null;
+    paxGroup = null;
+    startDate = null;
+    endDate = null; // Reset cả ngày về
+    difficultyLevel = null;
+    note = '';
+    selectedInterests = [];
+    tripName = '';
+
+    notifyListeners(); // Báo cho UI cập nhật lại trạng thái mới
+  }
+
   // API 1: Gợi ý Route (Giữ nguyên)
   Future<List<dynamic>> fetchSuggestedRoutes() async {
     final Map<String, dynamic> queryParams = {

@@ -19,7 +19,7 @@ class Command(BaseCommand):
                 "location": "Lai Châu",
                 "description": "Cung trekking khắc nghiệt nhất Tây Bắc. Vách đá dựng đứng, suối trơn trượt và nguy cơ lũ ống. Yêu cầu kỹ năng sinh tồn cao.",
                 "distance": 36.0, "elevation": 1600.0,
-                "tags": ["extreme", "hard", "Chuyên nghiệp", "cliff", "stream-crossing", "lai-chau"],
+                "tags": ["extreme", "hard", "Chuyên nghiệp", "cliff", "stream-crossing"],
             },
             {
                 "name": "Pusilung Border Trek",

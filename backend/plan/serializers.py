@@ -11,7 +11,7 @@ class RouteSerializer(serializers.ModelSerializer):
     class Meta:
         model = Route
         # Chỉ hiển thị các trường tóm tắt cho danh sách gợi ý
-        fields = ['id', 'name', 'description', 'total_distance_km', 'elevation_gain_m', 'tags']
+        fields = '__all__'
 
 
 class HistoryInputSerializer(serializers.ModelSerializer):

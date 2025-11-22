@@ -12,7 +12,10 @@ class Route(models.Model):
     elevation_gain_m = models.FloatField()
     path_coordinates = models.JSONField()
     tags = models.JSONField()  # Rất quan trọng cho việc matching [cite: 1332]
-    ai_note = models.TextField()
+    ai_note = models.TextField(null=True, blank=True)
+
+    image_url = models.URLField(max_length=500, null=True, blank=True)
+    gallery = models.JSONField(default=list, blank=True)
 
     def __str__(self):
         return self.name

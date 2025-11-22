@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 // Import đúng các file
 import '../../providers/trip_provider.dart';
 import '../features/preference_matching/models/route_model.dart';
-// 👇 Thay vì import HomeView, ta import trang kết quả chuyên biệt
 import '../features/preference_matching/screen/preference_matching_page.dart';
 
 class WaitingScreen extends StatefulWidget {
