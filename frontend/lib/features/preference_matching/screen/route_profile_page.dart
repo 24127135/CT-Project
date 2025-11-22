@@ -24,6 +24,7 @@ class _RouteProfilePageState extends State<RouteProfilePage> {
   void initState() {
     super.initState();
     _pageController = PageController();
+    // Sử dụng ảnh chính của route và thêm vài ảnh placeholder
     _imageUrls = [
       widget.route.imageUrl,
       'https://images.unsplash.com/photo-1501785888041-af3ef285b470?q=80&w=2070&auto=format&fit=crop',
@@ -39,7 +40,7 @@ class _RouteProfilePageState extends State<RouteProfilePage> {
 
   @override
   Widget build(BuildContext context) {
-    // Tăng chiều cao lên khoảng 48% - 50% màn hình để đủ chỗ hiển thị
+    // Chiều cao khung thông tin (khoảng 50% màn hình)
     final sheetHeight = MediaQuery.of(context).size.height * 0.5;
 
     return Scaffold(
@@ -61,7 +62,7 @@ class _RouteProfilePageState extends State<RouteProfilePage> {
       ),
       body: Stack(
         children: [
-          // Carousel Ảnh nền
+          // 1. Carousel Ảnh nền
           PageView.builder(
             controller: _pageController,
             itemCount: _imageUrls.length,
@@ -77,7 +78,7 @@ class _RouteProfilePageState extends State<RouteProfilePage> {
             },
           ),
 
-          // Bottom Info Sheet
+          // 2. Bottom Info Sheet (Khung thông tin bên dưới)
           Align(
             alignment: Alignment.bottomCenter,
             child: ClipRRect(
@@ -85,26 +86,28 @@ class _RouteProfilePageState extends State<RouteProfilePage> {
               child: BackdropFilter(
                 filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
                 child: Container(
-                  height: sheetHeight, // Sửa chiều cao
-                  padding: const EdgeInsets.fromLTRB(24, 24, 24, 20), // Giảm padding bottom chút
+                  height: sheetHeight,
+                  padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
                   decoration: BoxDecoration(
                     color: Colors.black.withOpacity(0.5),
                     borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
                   ),
-                  // THÊM: SingleChildScrollView để cuộn nếu nội dung quá dài
+                  // SingleChildScrollView giúp cuộn nếu nội dung quá dài
                   child: SingleChildScrollView(
                     physics: const BouncingScrollPhysics(),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // Tên Cung Đường
                         Text(
                           widget.route.name,
                           style: AppStyles.profileTitle,
-                          maxLines: 2, // Giới hạn 2 dòng
+                          maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 8),
+                        // Địa điểm
                         Text(
                           widget.route.location,
                           style: AppStyles.profileSubtitle,
@@ -113,7 +116,7 @@ class _RouteProfilePageState extends State<RouteProfilePage> {
                         ),
                         const SizedBox(height: 24),
 
-                        // Stats Grid
+                        // Hàng 1: Khoảng cách & Độ cao
                         Row(
                           children: [
                             Expanded(child: _buildStatBox("${widget.route.distanceKm}", "km", "Tổng chiều dài")),
@@ -122,6 +125,8 @@ class _RouteProfilePageState extends State<RouteProfilePage> {
                           ],
                         ),
                         const SizedBox(height: 16),
+
+                        // Hàng 2: Thời gian & Địa hình
                         Row(
                           children: [
                             Expanded(child: _buildDurationStatBox(
@@ -130,14 +135,13 @@ class _RouteProfilePageState extends State<RouteProfilePage> {
                                 "Thời gian ước tính"
                             )),
                             const SizedBox(width: 16),
-                            // Chỗ này dễ bị lỗi overflow ngang nhất, cần xử lý kỹ trong _buildStatBox
                             Expanded(child: _buildStatBox(widget.route.terrain, "", "Địa hình")),
                           ],
                         ),
 
-                        const SizedBox(height: 32), // Khoảng cách trước nút bấm
+                        const SizedBox(height: 32),
 
-                        // Button
+                        // Button Bản đồ
                         CustomButton(
                           text: 'Bản đồ',
                           onPressed: () {
@@ -149,7 +153,6 @@ class _RouteProfilePageState extends State<RouteProfilePage> {
                           style: AppStyles.profileButton,
                           backgroundColor: AppColors.primaryGreen,
                         ),
-                        // Thêm khoảng trống dưới cùng để không bị sát mép màn hình quá
                         const SizedBox(height: 20),
                       ],
                     ),
@@ -159,9 +162,8 @@ class _RouteProfilePageState extends State<RouteProfilePage> {
             ),
           ),
 
-          // Page Indicator (Chấm tròn chuyển trang)
+          // 3. Page Indicator (Chấm tròn chuyển trang)
           Positioned(
-            // Đặt vị trí dựa trên chiều cao mới của Sheet
             bottom: sheetHeight + 10,
             left: 0,
             right: 0,
@@ -186,21 +188,30 @@ class _RouteProfilePageState extends State<RouteProfilePage> {
     );
   }
 
-  // Widget helper đã được nâng cấp để chống tràn chữ ngang
+  // --- WIDGET CON: Ô THÔNG TIN (TIÊU ĐỀ TRÊN - SỐ LIỆU DƯỚI) ---
   Widget _buildStatBox(String mainValue, String subValue, String label) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // 1. Label (Tiêu đề nhỏ) nằm trên
+        Text(
+            label,
+            style: AppStyles.statLabel.copyWith(fontSize: 12),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis
+        ),
+        const SizedBox(height: 4),
+
+        // 2. Value (Số liệu to) nằm dưới
         Row(
           crossAxisAlignment: CrossAxisAlignment.baseline,
           textBaseline: TextBaseline.alphabetic,
           children: [
-            // Flexible giúp text tự xuống dòng hoặc cắt bớt nếu quá dài
             Flexible(
               child: Text(
                 mainValue,
-                style: AppStyles.statValue.copyWith(fontSize: 24), // Giảm font size một chút nếu cần
-                maxLines: 1,
+                style: AppStyles.statValue.copyWith(fontSize: 22),
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
             ),
@@ -211,38 +222,35 @@ class _RouteProfilePageState extends State<RouteProfilePage> {
               ),
           ],
         ),
-        const SizedBox(height: 4),
-        Text(
-            label,
-            style: AppStyles.statLabel.copyWith(fontSize: 12),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis
-        ),
       ],
     );
   }
 
+  // --- WIDGET CON: Ô THỜI GIAN (TIÊU ĐỀ TRÊN - SỐ LIỆU DƯỚI) ---
   Widget _buildDurationStatBox(String days, String daysLabel, String nights, String nightsLabel, String label) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Wrap( // Dùng Wrap để an toàn hơn Row nếu màn hình quá nhỏ
+        // 1. Label nằm trên
+        Text(label, style: AppStyles.statLabel.copyWith(fontSize: 12), maxLines: 1),
+        const SizedBox(height: 4),
+
+        // 2. Value nằm dưới
+        Wrap(
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            Text(days, style: AppStyles.statValue.copyWith(fontSize: 24)),
+            Text(days, style: AppStyles.statValue.copyWith(fontSize: 22)),
             Padding(
               padding: const EdgeInsets.only(left: 2, right: 4),
               child: Text(daysLabel, style: AppStyles.statUnit.copyWith(fontSize: 14)),
             ),
-            Text(nights, style: AppStyles.statValue.copyWith(fontSize: 24)),
+            Text(nights, style: AppStyles.statValue.copyWith(fontSize: 22)),
             Padding(
               padding: const EdgeInsets.only(left: 2),
               child: Text(nightsLabel, style: AppStyles.statUnit.copyWith(fontSize: 14)),
             ),
           ],
         ),
-        const SizedBox(height: 4),
-        Text(label, style: AppStyles.statLabel.copyWith(fontSize: 12), maxLines: 2),
       ],
     );
   }
