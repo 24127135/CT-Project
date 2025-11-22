@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'trip_dashboard_1.dart';
+import 'tripinfopart1.dart';
 
 class Trip {
   final String title;
@@ -112,7 +112,7 @@ class TripCard extends StatelessWidget {
       onTap: () {
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (context) => const TripDashboard1()),
+          MaterialPageRoute(builder: (context) => const TripInfoScreen()),
         );
       },
       child: ClipRRect(

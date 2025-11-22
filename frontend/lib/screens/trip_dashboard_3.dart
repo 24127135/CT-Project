@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'trip_dashboard_1.dart';
 import 'trip_dashboard_2.dart';
+import 'trip_dashboard_note.dart';
 
 const kBgColor = Color(0xFFF8F6F2);
 const kPrimaryGreen = Color(0xFF38C148);
@@ -15,38 +16,15 @@ class TripDashboard3 extends StatefulWidget {
 class _TripDashboard3State extends State<TripDashboard3> {
   final List<String> _notes = [];
 
-  void _addNote() async {
-    final result = await showDialog<String>(
-      context: context,
-      builder: (context) {
-        final controller = TextEditingController();
-        return AlertDialog(
-          title: const Text('Thêm ghi chú mới'),
-          content: TextField(
-            controller: controller,
-            autofocus: true,
-            decoration: const InputDecoration(
-              hintText: 'Nội dung ghi chú',
-            ),
-            onSubmitted: (value) => Navigator.of(context).pop(value),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Hủy'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(controller.text),
-              child: const Text('Thêm'),
-            ),
-          ],
-        );
-      },
+  void _navigateToNoteScreen() async {
+    final newNote = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(builder: (context) => const TripDashboardNote()),
     );
 
-    if (result != null && result.isNotEmpty) {
+    if (newNote != null && newNote.isNotEmpty) {
       setState(() {
-        _notes.add(result);
+        _notes.add(newNote);
       });
     }
   }
@@ -69,14 +47,15 @@ class _TripDashboard3State extends State<TripDashboard3> {
                 itemBuilder: (context, index) {
                   final note = _notes[index];
                   return Dismissible(
-                    key: Key(note + index.toString()), // Unique key
-                    direction: DismissDirection.endToStart,
+                    key: Key(note + index.toString()), // Unique key for each item
+                    direction: DismissDirection.endToStart, // Swipe from right to left
                     onDismissed: (direction) {
                       setState(() {
                         _notes.removeAt(index);
                       });
+
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('"$note" đã được xóa')),
+                        SnackBar(content: Text("'$note' đã được xóa")),
                       );
                     },
                     background: Container(
@@ -85,18 +64,26 @@ class _TripDashboard3State extends State<TripDashboard3> {
                         color: Colors.red,
                         borderRadius: BorderRadius.circular(24),
                       ),
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      alignment: Alignment.centerRight,
-                      child: const Icon(Icons.delete, color: Colors.white),
+                      child: const Align(
+                        alignment: Alignment.centerRight,
+                        child: Padding(
+                          padding: EdgeInsets.only(right: 20.0),
+                          child: Icon(Icons.delete, color: Colors.white),
+                        ),
+                      ),
                     ),
                     child: Container(
-                      padding: const EdgeInsets.all(16),
+                      width: double.infinity,
                       margin: const EdgeInsets.only(bottom: 16),
+                      padding: const EdgeInsets.all(16.0),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFE2E0DD),
+                        color: Colors.grey[200],
                         borderRadius: BorderRadius.circular(24),
                       ),
-                      child: Text(note),
+                      child: Text(
+                        note,
+                        style: const TextStyle(fontSize: 16, color: Colors.black87),
+                      ),
                     ),
                   );
                 },
@@ -107,8 +94,8 @@ class _TripDashboard3State extends State<TripDashboard3> {
       ),
       floatingActionButton: FloatingActionButton(
         backgroundColor: kPrimaryGreen,
-        onPressed: _addNote,
-        child: const Icon(Icons.add),
+        onPressed: _navigateToNoteScreen,
+        child: const Icon(Icons.add, color: Colors.white),
       ),
     );
   }

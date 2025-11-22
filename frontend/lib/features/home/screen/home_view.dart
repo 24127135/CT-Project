@@ -4,6 +4,8 @@ import 'package:frontend/features/preference_matching/screen/route_profile_page.
 import 'package:frontend/features/preference_matching/models/mock_route.dart';
 import 'package:frontend/utils/app_colors.dart';
 import 'package:frontend/utils/app_styles.dart';
+import 'package:frontend/screens/home_screen.dart';
+import 'package:frontend/widgets/custom_button.dart';
 
 class HomeView extends StatelessWidget {
   const HomeView({super.key});
@@ -13,17 +15,14 @@ class HomeView extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.lightGray,
       appBar: AppBar(
-        title: const Text('Trang chủ', style: AppStyles.appBarTitle),
+        title: const Text('Gợi ý cho bạn', style: AppStyles.appBarTitle),
         backgroundColor: AppColors.lightGray,
         elevation: 0,
         automaticallyImplyLeading: false,
       ),
       body: ListView(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 100), // Add padding to bottom for the button
         children: [
-          const SizedBox(height: 16),
-          const Text('Gợi ý cho bạn', style: AppStyles.heading),
-          const SizedBox(height: 16),
           ...mockRoutes.map((route) => Padding(
                 padding: const EdgeInsets.only(bottom: 16),
                 child: RouteCard(
@@ -39,6 +38,19 @@ class HomeView extends StatelessWidget {
                 ),
               )),
         ],
+      ),
+      bottomSheet: Container(
+        color: AppColors.lightGray,
+        padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
+        child: CustomButton(
+          text: 'Trang chủ',
+          onPressed: () {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const HomePage()),
+            );
+          },
+        ),
       ),
     );
   }
