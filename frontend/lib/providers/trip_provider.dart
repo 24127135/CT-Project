@@ -1,25 +1,15 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import '../services/api_service.dart';
 
 class TripProvider with ChangeNotifier {
   // 1. Lấy IP từ biến môi trường 'SERVER_IP'.
   // Nếu không có (ví dụ quên chạy script), mặc định về localhost của Android (10.0.2.2)
-  static const String _serverIp = String.fromEnvironment(
-      'SERVER_IP',
-      defaultValue: '10.0.2.2'
-  );
 
   // 2. Ghép vào chuỗi URL
-  static const String _baseUrl = 'http://$_serverIp:8000/api';
-  final String _jwtToken;
+    // Removed unused server IP constant
+  final ApiService _api = ApiService();
 
-  TripProvider(this._jwtToken);
-
-  Map<String, String> get _authHeaders => {
-    'Content-Type': 'application/json',
-    //'Authorization': 'Bearer $_jwtToken',
-  };
+  TripProvider([String? unused]);
 
   // --- DỮ LIỆU ---
   String searchLocation = '';
@@ -108,16 +98,15 @@ class TripProvider with ChangeNotifier {
       (queryParams['interests'] ??= []).add(interest);
     }
 
-    final uri = Uri.parse('$_baseUrl/routes/suggested/').replace(
-      queryParameters: queryParams.map((key, value) {
-        if (value is List) return MapEntry(key, value.map((e) => e.toString()).toList());
-        return MapEntry(key, value.toString());
-      }),
-    );
+    // Convert list params to repeated query params or comma-separated values depending on backend expectations
+    final qp = <String, dynamic>{};
+    queryParams.forEach((k, v) {
+      if (v is List) qp[k] = v.map((e) => e.toString()).toList();
+      else qp[k] = v.toString();
+    });
 
-    final response = await http.get(uri, headers: _authHeaders);
-    if (response.statusCode == 200) return json.decode(response.body);
-    throw Exception('Lỗi tải lộ trình: ${response.statusCode}');
+    final res = await _api.fetchSuggestedRoutes(qp);
+    return res;
   }
 
   // API 2: Lưu Mẫu (Cập nhật durationDays)
@@ -133,15 +122,7 @@ class TripProvider with ChangeNotifier {
       'personalInterest': selectedInterests,
     };
 
-    final response = await http.post(
-      Uri.parse('$_baseUrl/history-inputs/'),
-      headers: _authHeaders,
-      body: json.encode(body),
-    );
-
-    if (response.statusCode != 201) {
-      throw Exception('Lỗi lưu mẫu: ${response.body}');
-    }
+    await _api.saveHistoryInput(body);
   }
 
   // API 3: Tạo Plan (Cập nhật durationDays)
@@ -158,16 +139,7 @@ class TripProvider with ChangeNotifier {
       'personalInterest': selectedInterests,
     };
 
-    final response = await http.post(
-      Uri.parse('$_baseUrl/plans/'),
-      headers: _authHeaders,
-      body: json.encode(body),
-    );
-
-    if (response.statusCode == 201) {
-      return json.decode(response.body);
-    } else {
-      throw Exception('Lỗi tạo Plan: ${response.body}');
-    }
+    final created = await _api.createPlan(body);
+    return created;
   }
 }

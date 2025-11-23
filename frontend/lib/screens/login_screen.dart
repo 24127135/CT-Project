@@ -4,7 +4,6 @@ import '../widgets/custom_button.dart';
 import '../utils/app_colors.dart';
 import '../utils/app_styles.dart';
 import '../services/auth_service.dart';
-import 'otp_verification_screen.dart';
 import 'signup_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -39,21 +38,20 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     setState(() => _isLoading = true);
-    final success = await _authService.login(email, password);
-
-    if (mounted) setState(() => _isLoading = false);
-
-    if (success) {
-      if (!mounted) return;
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => OtpVerificationScreen(email: email)),
-      );
-    } else {
+    try {
+      await _authService.login(email, password);
+      // AuthGate will react to session changes and navigate to Home.
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Đăng nhập thất bại. Vui lòng kiểm tra email hoặc mật khẩu.'), backgroundColor: Colors.red),
+        const SnackBar(content: Text('Đăng nhập thành công')),
       );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Đăng nhập thất bại: $e'), backgroundColor: Colors.red),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 

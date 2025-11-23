@@ -1,80 +1,181 @@
-import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:dio/dio.dart';
+import '../core/supabase_config.dart';
+
+enum VerifyMode {
+  unknown,
+  verifyOtpNamed,
+  verifyOtpPositional,
+  verifyOtpTokenFirst,
+  verifyOtpTokenNamed,
+  verifyOtpEnum,
+  confirmOtpNamed,
+  signInWithOtpPositional,
+  signInWithOtpNamed,
+  rest
+}
 
 class AuthService {
-  // NOTE: For Android Emulator, use 10.0.2.2. 
-  // If testing on a real phone, use your computer's LAN IP (e.g., 192.168.1.x)
-  static const String baseUrl = 'http://10.0.2.2:8000/api/auth';
+  final _client = Supabase.instance.client;
 
-  // Login Function
-  Future<bool> login(String email, String password) async {
-    final url = Uri.parse('$baseUrl/login/');
-    try {
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'email': email, 'password': password}),
-      );
+  /// Sign up using email & password via Supabase Auth
+  Future<AuthResponse> register(String email, String password) async {
+    return await _client.auth.signUp(email: email, password: password);
+  }
 
-      if (response.statusCode == 200) {
-        return true; // OTP sent successfully
-      } else {
-        print('Login Failed: ${response.body}');
+  /// Sign in using email & password
+  Future<AuthResponse> login(String email, String password) async {
+    return await _client.auth.signInWithPassword(email: email, password: password);
+  }
+
+  /// Send a magic link / email OTP to the provided email
+  /// Send an email OTP (one-time code) to the provided email
+  Future<void> sendEmailOtp(String email) async {
+    // Do not provide an email redirect so Supabase sends an OTP code instead of a magic link
+    await _client.auth.signInWithOtp(email: email);
+  }
+
+  /// Verify an email OTP code previously sent to `email`.
+  ///
+  /// Different `supabase_flutter` versions expose different methods for
+  /// verifying OTPs. This method tries a few call signatures dynamically
+  /// and completes successfully if any of them succeeds. It throws on
+  /// failure so callers can handle the error.
+  VerifyMode? _preferredVerifyMode;
+
+  Future<VerifyMode> _determinePreferredMode() async {
+    if (_preferredVerifyMode != null && _preferredVerifyMode != VerifyMode.unknown) {
+      return _preferredVerifyMode!;
+    }
+
+    final auth = _client.auth;
+    final dynamicAuth = auth as dynamic;
+
+    const probeEmail = 'probe@example.com';
+    const probeToken = '000000';
+
+    Future<bool> probe(Future<dynamic> Function() call) async {
+      try {
+        await call();
+        return true;
+      } on NoSuchMethodError catch (_) {
         return false;
+      } catch (e) {
+        return true;
       }
-    } catch (e) {
-      print('Connection Error: $e');
-      return false;
     }
+
+    if (await probe(() => dynamicAuth.verifyOtp(probeEmail, probeToken, 'email'))) {
+      _preferredVerifyMode = VerifyMode.verifyOtpPositional;
+      return _preferredVerifyMode!;
+    }
+    if (await probe(() => dynamicAuth.verifyOtp(email: probeEmail, token: probeToken, type: 'email'))) {
+      _preferredVerifyMode = VerifyMode.verifyOtpNamed;
+      return _preferredVerifyMode!;
+    }
+    if (await probe(() => dynamicAuth.verifyOTP(probeToken, 'email'))) {
+      _preferredVerifyMode = VerifyMode.verifyOtpPositional;
+      return _preferredVerifyMode!;
+    }
+    if (await probe(() => dynamicAuth.verifyOtp(probeToken, 'email'))) {
+      _preferredVerifyMode = VerifyMode.verifyOtpTokenFirst;
+      return _preferredVerifyMode!;
+    }
+    if (await probe(() => dynamicAuth.verifyOtp(token: probeToken, type: 'email'))) {
+      _preferredVerifyMode = VerifyMode.verifyOtpTokenNamed;
+      return _preferredVerifyMode!;
+    }
+    if (await probe(() => dynamicAuth.verifyOtp(token: probeToken, type: OtpType.email))) {
+      _preferredVerifyMode = VerifyMode.verifyOtpEnum;
+      return _preferredVerifyMode!;
+    }
+    if (await probe(() => dynamicAuth.confirmOtp(email: probeEmail, token: probeToken))) {
+      _preferredVerifyMode = VerifyMode.confirmOtpNamed;
+      return _preferredVerifyMode!;
+    }
+    if (await probe(() => dynamicAuth.signInWithOtp(probeEmail, probeToken))) {
+      _preferredVerifyMode = VerifyMode.signInWithOtpPositional;
+      return _preferredVerifyMode!;
+    }
+    if (await probe(() => dynamicAuth.signInWithOtp(email: probeEmail, token: probeToken))) {
+      _preferredVerifyMode = VerifyMode.signInWithOtpNamed;
+      return _preferredVerifyMode!;
+    }
+
+    _preferredVerifyMode = VerifyMode.rest;
+    return _preferredVerifyMode!;
   }
 
-  // Registration Function
-  Future<bool> register(String email, String fullName, String password) async {
-    final url = Uri.parse('$baseUrl/register/');
+  Future<void> verifyEmailOtp(String email, String token) async {
+    final mode = await _determinePreferredMode();
+    final auth = _client.auth;
+    final dynamicAuth = auth as dynamic;
+
     try {
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'email': email,
-          'full_name': fullName,
-          'password': password,
-          'password_confirm': password, // Required by your Django Serializer
-        }),
-      );
-
-      if (response.statusCode == 201) {
-        return true; // Registered & OTP sent
-      } else {
-        print('Register Failed: ${response.body}');
-        return false;
+      switch (mode) {
+        case VerifyMode.verifyOtpPositional:
+          await dynamicAuth.verifyOtp(email, token, 'email');
+          return;
+        case VerifyMode.verifyOtpNamed:
+          await dynamicAuth.verifyOtp(email: email, token: token, type: 'email');
+          return;
+        case VerifyMode.verifyOtpTokenFirst:
+          await dynamicAuth.verifyOtp(token, 'email');
+          return;
+        case VerifyMode.verifyOtpTokenNamed:
+          await dynamicAuth.verifyOtp(token: token, type: 'email');
+          return;
+        case VerifyMode.verifyOtpEnum:
+          await dynamicAuth.verifyOtp(token: token, type: OtpType.email);
+          return;
+        case VerifyMode.confirmOtpNamed:
+          await dynamicAuth.confirmOtp(email: email, token: token);
+          return;
+        case VerifyMode.signInWithOtpPositional:
+          await dynamicAuth.signInWithOtp(email, token);
+          return;
+        case VerifyMode.signInWithOtpNamed:
+          await dynamicAuth.signInWithOtp(email: email, token: token);
+          return;
+        case VerifyMode.rest:
+          await _verifyEmailOtpRest(email, token);
+          return;
+        default:
+          await _verifyEmailOtpRest(email, token);
+          return;
       }
     } catch (e) {
-      print('Connection Error: $e');
-      return false;
+      if (mode != VerifyMode.rest) {
+        try {
+          await _verifyEmailOtpRest(email, token);
+          return;
+        } catch (_) {
+        }
+      }
+      rethrow;
     }
   }
 
-  // Verify OTP Function
-  Future<Map<String, dynamic>?> verifyOtp(String email, String otp) async {
-    final url = Uri.parse('$baseUrl/verify-otp/');
-    try {
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'email': email, 'otp': otp}),
-      );
+  Future<void> _verifyEmailOtpRest(String email, String token) async {
+    final dio = Dio();
+    final endpoint = '$supabaseUrl/auth/v1/verify';
+    final headers = {
+      'apikey': supabaseAnonKey,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    };
+    final body = {'email': email, 'token': token, 'type': 'email'};
 
-      if (response.statusCode == 200) {
-        // Returns the Access & Refresh tokens
-        return jsonDecode(response.body); 
-      } else {
-        print('Verification Failed: ${response.body}');
-        return null;
-      }
-    } catch (e) {
-      print('Connection Error: $e');
-      return null;
+    final resp = await dio.post(endpoint, data: body, options: Options(headers: headers));
+    if (resp.statusCode != null && (resp.statusCode! >= 200 && resp.statusCode! < 300)) {
+      return;
     }
+    throw Exception('REST verify failed: ${resp.statusCode} ${resp.data}');
   }
+
+  /// Get current session (managed by Supabase client)
+  Session? get currentSession => _client.auth.currentSession;
+
+  /// Sign out
+  Future<void> signOut() async => await _client.auth.signOut();
 }

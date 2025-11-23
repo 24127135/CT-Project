@@ -32,29 +32,28 @@ class _SignupScreenState extends State<SignupScreen> {
     }
 
     final email = _emailController.text.trim();
-    final name = _nameController.text.trim();
+    // name is optional for now — Supabase signUp handles basic profile creation.
     final password = _passwordController.text.trim();
 
     setState(() => _isLoading = true);
 
-    // Call Backend
-    final success = await _authService.register(email, name, password);
-
-    setState(() => _isLoading = false);
-
-    if (success) {
+    try {
+      await _authService.register(email, password);
       if (!mounted) return;
+      // After signup, user must confirm via email (magic link). Show OTP screen to instruct.
       Navigator.push(
         context,
         MaterialPageRoute(
           builder: (context) => OtpVerificationScreen(email: email),
         ),
       );
-    } else {
+    } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Registration failed. Email might exist.')),
+        SnackBar(content: Text('Registration failed: $e')),
       );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 

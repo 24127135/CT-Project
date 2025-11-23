@@ -1,18 +1,21 @@
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+/// TokenService is now a thin adapter around Supabase session management.
 class TokenService {
-  final _storage = const FlutterSecureStorage();
-  static const _tokenKey = 'auth_token';
-
-  Future<void> saveToken(String token) async {
-    await _storage.write(key: _tokenKey, value: token);
-  }
-
+  /// Returns the current access token from Supabase session, or null.
   Future<String?> getToken() async {
-    return await _storage.read(key: _tokenKey);
+    final session = Supabase.instance.client.auth.currentSession;
+    return session?.accessToken;
   }
 
+  /// Clear token / sign out via Supabase
   Future<void> clearToken() async {
-    await _storage.delete(key: _tokenKey);
+    await Supabase.instance.client.auth.signOut();
+  }
+
+  /// Deprecated: saving tokens is managed by the Supabase client.
+  Future<void> saveToken(String token) async {
+    // Supabase client persists sessions automatically; no-op kept for compatibility.
+    return;
   }
 }

@@ -1,0 +1,9 @@
+Django==5.2.8
+djangorestframework
+djangorestframework-simplejwt
+python-dotenv
+psycopg2-binary
+PyJWT
+requests
+django-cors-headers
+djangorestframework-camel-case
