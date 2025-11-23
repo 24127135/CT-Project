@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../providers/trip_provider.dart';
+import '../services/supabase_db_service.dart';
 import 'trip_info_waiting_screen.dart';
 
 class TripConfirmScreen extends StatefulWidget {
@@ -108,9 +109,6 @@ class _TripConfirmScreenState extends State<TripConfirmScreen> {
                 children: [
                   _buildSummaryItem('Địa điểm', tripData.searchLocation.isEmpty ? 'Chưa chọn' : tripData.searchLocation),
                   _buildSummaryItem('Thời gian', displayDate),
-
-                  // ĐÃ XÓA DÒNG NGÂN SÁCH Ở ĐÂY
-
                   _buildSummaryItem('Loại hình ngủ nghỉ', tripData.accommodation ?? 'Chưa chọn'),
                   _buildSummaryItem('Số người', tripData.paxGroup ?? 'Chưa chọn'),
                   _buildSummaryItem('Độ khó', tripData.difficultyLevel ?? 'Chưa chọn'),
@@ -157,19 +155,30 @@ class _TripConfirmScreenState extends State<TripConfirmScreen> {
             Expanded(
               child: ElevatedButton(
                 onPressed: () async {
-                  // GỌI API LƯU MẪU
+                  // Save template using Supabase DB service (client-side)
                   try {
-                    // Lấy tên mẫu (nếu người dùng chưa đặt tên trip, lấy tên mặc định)
                     String tName = tripData.tripName.isEmpty ? "Mẫu mới ${DateTime.now().minute}" : tripData.tripName;
 
-                    await context.read<TripProvider>().saveHistoryInput(tName);
+                    final db = SupabaseDbService();
+                    await db.saveHistoryInput(tName, {
+                      'searchLocation': tripData.searchLocation,
+                      'startDate': tripData.startDate?.toIso8601String(),
+                      'endDate': tripData.endDate?.toIso8601String(),
+                      'durationDays': tripData.durationDays,
+                      'accommodation': tripData.accommodation,
+                      'paxGroup': tripData.paxGroup,
+                      'difficultyLevel': tripData.difficultyLevel,
+                      'note': tripData.note,
+                      'selectedInterests': tripData.selectedInterests,
+                      'tripName': tripData.tripName,
+                    });
 
                     ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Đã lưu mẫu thành công!'), backgroundColor: Colors.green)
+                      const SnackBar(content: Text('Đã lưu mẫu thành công!'), backgroundColor: Colors.green),
                     );
                   } catch (e) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Lỗi khi lưu: $e'), backgroundColor: Colors.red)
+                      SnackBar(content: Text('Lỗi khi lưu: $e'), backgroundColor: Colors.red),
                     );
                   }
                 },

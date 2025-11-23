@@ -5,6 +5,7 @@ import '../utils/app_colors.dart';
 import '../utils/app_styles.dart';
 import '../services/auth_service.dart';
 import 'signup_screen.dart';
+import 'otp_verification_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -39,12 +40,23 @@ class _LoginScreenState extends State<LoginScreen> {
 
     setState(() => _isLoading = true);
     try {
-      await _authService.login(email, password);
-      // AuthGate will react to session changes and navigate to Home.
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Đăng nhập thành công')),
-      );
+      final hasSession = await _authService.login(email, password);
+      if (hasSession) {
+        if (!mounted) return;
+        Navigator.of(context).pushReplacementNamed('/home');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Đăng nhập thành công')),
+        );
+        return;
+      } else {
+        // No session: likely passwordless/OTP flow — navigate to OTP verification.
+        if (!mounted) return;
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => OtpVerificationScreen(email: email)),
+        );
+        return;
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
