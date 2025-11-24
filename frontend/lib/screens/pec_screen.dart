@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../providers/pec_provider.dart';
-import '../widgets/pec_item_widget.dart'; // Import the widget
+import '../widgets/pec_item_widget.dart';
 import '../widgets/add_item_modal.dart';
 
 class PecScreen extends StatelessWidget {
@@ -88,7 +88,7 @@ class PecScreen extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFFE0E0E0), // Light grey background for the tab bar
+        color: const Color(0xFFE0E0E0),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -125,15 +125,13 @@ class PecScreen extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
       child: Row(
         children: [
-          // "Xem theo giá" Button
           Expanded(
             child: GestureDetector(
               onTap: () => context.read<PecProvider>().setSort('Xem theo giá'),
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 10),
                 decoration: BoxDecoration(
-                  color: primaryGreen, // Always green as per image 1 & 2 (or togglable?)
-                  // Actually, let's keep it green to match the "active" look in the image
+                  color: primaryGreen,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 alignment: Alignment.center,
@@ -145,7 +143,6 @@ class PecScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          // Sort Options
           ...['Giá Thấp - Cao', 'Giá Cao - Thấp'].map((opt) {
             final isSelected = pecProvider.selectedSort == opt;
             return Expanded(
@@ -213,12 +210,15 @@ class PecScreen extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              TextButton(onPressed: (){
-                context.read<PecProvider>().setSort('Giá Thấp - Cao'); // To close the filter
-              }, child: Text("Đóng", style: TextStyle(color: darkText))),
+              TextButton(
+                onPressed: () {
+                  context.read<PecProvider>().setSort('Giá Thấp - Cao');
+                },
+                child: Text("Đóng", style: TextStyle(color: darkText))
+              ),
               ElevatedButton(
                 onPressed: () {
-                   context.read<PecProvider>().setSort('Giá Thấp - Cao'); // To close and apply
+                  context.read<PecProvider>().setSort('Giá Thấp - Cao');
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: primaryGreen,
@@ -246,39 +246,80 @@ class PecScreen extends StatelessWidget {
 
   Widget _buildBottomBar(BuildContext context, PecProvider pecProvider) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10)],
-        borderRadius: const BorderRadius.only(topLeft: Radius.circular(20), topRight: Radius.circular(20))
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            children: [
-              Checkbox(
-                value: pecProvider.areAllItemsChecked, 
-                onChanged: (bool? value) {
-                  context.read<PecProvider>().toggleSelectAll(value);
-                }
-              ),
-              const Text("Tất cả", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            ],
-          ),
-          Text(pecProvider.totalPrice, style: TextStyle(color: priceColor, fontWeight: FontWeight.bold, fontSize: 18)),
-          ElevatedButton(
-            onPressed: () {
-              // Navigate to Trip Dashboard
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: primaryGreen,
-              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-            ),
-            child: const Text('Xác nhận', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, -5),
           ),
         ],
+      ),
+      child: SafeArea(
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Tổng cộng:', style: TextStyle(color: lightText, fontSize: 14)),
+                  Consumer<PecProvider>(
+                    builder: (context, provider, child) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            provider.totalPrice,
+                            style: TextStyle(
+                              color: priceColor,
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            '${(provider.totalWeight / 1000).toStringAsFixed(1)} kg',
+                            style: TextStyle(
+                              color: darkText,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: ElevatedButton(
+                onPressed: () {
+                  // TODO: Implement confirmation logic
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryGreen,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 0,
+                ),
+                child: const Text(
+                  'Xác nhận',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

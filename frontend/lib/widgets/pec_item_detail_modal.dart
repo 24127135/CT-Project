@@ -124,6 +124,16 @@ class _PecItemDetailModalState extends State<PecItemDetailModal> {
               color: lightText,
             ),
           ),
+          if (widget.item['weight'] != null && widget.item['weight'] > 0) ...[
+            const SizedBox(height: 4),
+            Text(
+              'Khối lượng: ${widget.item['weight']}g',
+              style: TextStyle(
+                fontSize: 14,
+                color: lightText,
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
 
           // Description Box

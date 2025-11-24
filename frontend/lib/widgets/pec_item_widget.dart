@@ -66,7 +66,20 @@ class PecItemWidget extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(item['name'], style: TextStyle(fontWeight: FontWeight.bold, color: darkText)),
-                  Text(item['store'], style: TextStyle(color: lightText, fontSize: 12)),
+                  Row(
+                    children: [
+                      Text(item['store'], style: TextStyle(color: lightText, fontSize: 12)),
+                      if (item['weight'] != null && item['weight'] > 0) ...[
+                        const SizedBox(width: 8),
+                        Container(width: 1, height: 10, color: Colors.grey.shade300),
+                        const SizedBox(width: 8),
+                        Text(
+                          '${item['weight']}g',
+                          style: TextStyle(color: lightText, fontSize: 12),
+                        ),
+                      ],
+                    ],
+                  ),
                   Text(
                     '${currencyFormatter.format(item['price'] * (item['quantity'] > 0 ? item['quantity'] : 1))} đ', 
                     style: TextStyle(color: priceColor, fontWeight: FontWeight.bold)
