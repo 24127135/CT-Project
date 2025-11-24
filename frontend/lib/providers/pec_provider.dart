@@ -70,22 +70,24 @@ class PecProvider with ChangeNotifier {
 
   String _selectedCategory = 'Quần áo';
   String _selectedSort = 'Xem theo giá';
+  String _searchQuery = '';
   RangeValues _priceRange = const RangeValues(0, 42000000);
   bool _isPriceFilterVisible = false;
 
   List<Map<String, dynamic>> get items {
     List<Map<String, dynamic>> filteredItems = List.from(_items);
 
+    // Filter by Search Query
+    if (_searchQuery.isNotEmpty) {
+      filteredItems = filteredItems.where((item) => 
+        item['name'].toLowerCase().contains(_searchQuery.toLowerCase())
+      ).toList();
+    }
+
     // Filter by Category
     if (_selectedCategory.isNotEmpty) {
       filteredItems = filteredItems.where((item) => item['category'] == _selectedCategory).toList();
     }
-
-    // Filter by Price Range (Optional, but good to have consistent with UI)
-    // filteredItems = filteredItems.where((item) {
-    //   final price = item['price'] as num;
-    //   return price >= _priceRange.start && price <= _priceRange.end;
-    // }).toList();
 
     // Sort
     if (_selectedSort == 'Giá Thấp - Cao') {
@@ -99,8 +101,29 @@ class PecProvider with ChangeNotifier {
 
   String get selectedCategory => _selectedCategory;
   String get selectedSort => _selectedSort;
+  String get searchQuery => _searchQuery;
   RangeValues get priceRange => _priceRange;
   bool get isPriceFilterVisible => _isPriceFilterVisible;
+
+  void setSearchQuery(String query) {
+    _searchQuery = query;
+    notifyListeners();
+  }
+
+  void addItem(String name, String category, double price) {
+    final newItem = {
+      'id': DateTime.now().millisecondsSinceEpoch, // Simple ID generation
+      'name': name,
+      'store': 'Cá nhân', // Default store for custom items
+      'price': price,
+      'quantity': 1,
+      'checked': false,
+      'category': category,
+      'description': 'Vật dụng cá nhân thêm vào danh sách.'
+    };
+    _items.add(newItem);
+    notifyListeners();
+  }
 
   void setCategory(String category) {
     if (_selectedCategory == category) {

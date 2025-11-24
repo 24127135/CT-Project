@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../providers/pec_provider.dart';
 import '../widgets/pec_item_widget.dart'; // Import the widget
+import '../widgets/add_item_modal.dart';
 
 class PecScreen extends StatelessWidget {
   const PecScreen({super.key});
@@ -35,6 +36,40 @@ class PecScreen extends StatelessWidget {
           ),
         ),
         centerTitle: true,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(60),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: TextField(
+              onChanged: (value) => context.read<PecProvider>().setSearchQuery(value),
+              decoration: InputDecoration(
+                hintText: 'Tìm kiếm đồ dùng...',
+                prefixIcon: const Icon(Icons.search),
+                filled: true,
+                fillColor: lightGrey,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(30),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.symmetric(vertical: 0),
+              ),
+            ),
+          ),
+        ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            builder: (context) => const AddItemModal(),
+          );
+        },
+        backgroundColor: primaryGreen,
+        child: const Icon(Icons.add, color: Colors.white),
       ),
       body: Column(
         children: [
