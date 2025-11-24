@@ -8,7 +8,7 @@ void main() {
     MultiProvider(
       providers: [
         // FIXED: Removed the empty string argument. TripProvider() takes no arguments.
-        ChangeNotifierProvider(create: (_) => TripProvider()),
+        ChangeNotifierProvider(create: (_) => TripProvider('')),
       ],
       child: const MyApp(),
     ),
