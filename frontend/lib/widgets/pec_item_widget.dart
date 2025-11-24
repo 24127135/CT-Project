@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../providers/pec_provider.dart';
+import 'pec_item_detail_modal.dart';
 
 class PecItemWidget extends StatelessWidget {
   final Map<String, dynamic> item;
@@ -25,6 +26,14 @@ class PecItemWidget extends StatelessWidget {
       color: lightGrey.withOpacity(0.5),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: ListTile(
+        onTap: () {
+          showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            backgroundColor: Colors.transparent,
+            builder: (context) => PecItemDetailModal(item: item),
+          );
+        },
         leading: Checkbox(
           value: item['checked'],
           onChanged: (bool? value) {
