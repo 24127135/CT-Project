@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/trip_provider.dart';
 import '../features/preference_matching/models/route_model.dart';
-// RESOLVED: Import HomeView as the destination for results
-import '../features/home/screen/home_view.dart';
+import '../features/preference_matching/screen/preference_matching_page.dart';
 
 class WaitingScreen extends StatefulWidget {
   const WaitingScreen({super.key});

@@ -8,7 +8,6 @@ import 'home_screen.dart'; // Import HomePage
 
 class TripTimeScreen extends StatefulWidget {
   const TripTimeScreen({super.key});
-
   @override
   State<TripTimeScreen> createState() => _TripTimeScreenState();
 }
@@ -32,7 +31,6 @@ class _TripTimeScreenState extends State<TripTimeScreen> {
       cancelButtonTextStyle: const TextStyle(color: Colors.grey, fontWeight: FontWeight.bold),
       dayBorderRadius: BorderRadius.circular(8),
     );
-
     final List<DateTime?>? results = await showCalendarDatePicker2Dialog(
       context: context,
       config: config,
@@ -40,9 +38,11 @@ class _TripTimeScreenState extends State<TripTimeScreen> {
       borderRadius: BorderRadius.circular(15),
       value: (tripData.startDate != null && tripData.endDate != null) ? [tripData.startDate, tripData.endDate] : [],
     );
-
     if (results != null && results.length == 2 && results[0] != null && results[1] != null) {
-      context.read<TripProvider>().setTripDates(results[0]!, results[1]!);
+      // Sắp xếp lại ngày để đảm bảo start < end
+      final start = results[0]!.isBefore(results[1]!) ? results[0]! : results[1]!;
+      final end = results[0]!.isBefore(results[1]!) ? results[1]! : results[0]!;
+      context.read<TripProvider>().setTripDates(start, end);
     }
   }
 
@@ -51,7 +51,6 @@ class _TripTimeScreenState extends State<TripTimeScreen> {
     final tripData = context.watch<TripProvider>();
     String dateText = 'MM/DD/YYYY';
     bool hasDate = tripData.startDate != null && tripData.endDate != null;
-
     if (hasDate) {
       String start = DateFormat('dd/MM/yyyy').format(tripData.startDate!);
       String end = DateFormat('dd/MM/yyyy').format(tripData.endDate!);
@@ -61,6 +60,7 @@ class _TripTimeScreenState extends State<TripTimeScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
       appBar: AppBar(
+        // Nút Hủy về Home
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () {
@@ -72,7 +72,12 @@ class _TripTimeScreenState extends State<TripTimeScreen> {
             );
           },
         ),
-        title: const Column(
+        title: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('Thông tin chuyến đi', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)), Text('Bước 2/5', style: TextStyle(color: Colors.white70, fontSize: 14))]),
+        backgroundColor: primaryGreen, elevation: 0,
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('Thông tin chuyến đi', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
@@ -139,6 +144,7 @@ class _TripTimeScreenState extends State<TripTimeScreen> {
         padding: const EdgeInsets.all(16.0),
         child: Row(
           children: [
+            // Nút Back dưới
             Container(
               decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade300), borderRadius: BorderRadius.circular(8), color: Colors.white),
               child: IconButton(

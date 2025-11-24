@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/trip_provider.dart';
+import '../features/home/screen/home_view.dart';
 import 'tripinfopart5.dart';
 import 'home_screen.dart'; // Import HomePage
 
 class TripRequestScreen extends StatefulWidget {
   const TripRequestScreen({super.key});
-
   @override
   State<TripRequestScreen> createState() => _TripRequestScreenState();
 }
@@ -15,7 +15,6 @@ class _TripRequestScreenState extends State<TripRequestScreen> {
   late TextEditingController _noteController;
   final Color primaryGreen = const Color(0xFF4CAF50);
   final Color darkGreen = const Color(0xFF388E3C);
-
   final List<String> _suggestedInterests = ['Rừng nguyên sinh', 'Ngắm hoàng hôn', 'Ăn chay', 'Ngắm bình minh', 'Tiệc BBQ ngoài trời', 'Dị ứng hải sản', 'Tìm hiểu văn hóa địa phương', 'Chụp ảnh phong cảnh', 'Leo núi', 'Tắm suối', 'Thiền / Yoga'];
 
   @override
@@ -24,17 +23,12 @@ class _TripRequestScreenState extends State<TripRequestScreen> {
     final note = context.read<TripProvider>().note;
     _noteController = TextEditingController(text: note);
   }
-
   @override
-  void dispose() {
-    _noteController.dispose();
-    super.dispose();
-  }
+  void dispose() { _noteController.dispose(); super.dispose(); }
 
   @override
   Widget build(BuildContext context) {
     final tripData = context.watch<TripProvider>();
-
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -55,8 +49,8 @@ class _TripRequestScreenState extends State<TripRequestScreen> {
             Text('Bước 4/5', style: TextStyle(color: Colors.white70, fontSize: 14)),
           ],
         ),
-        backgroundColor: darkGreen,
-        elevation: 0,
+        title: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('Thông tin chuyến đi', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)), Text('Bước 4/5', style: TextStyle(color: Colors.white70, fontSize: 14))]),
+        backgroundColor: darkGreen, elevation: 0,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
@@ -122,7 +116,6 @@ class _TripRequestScreenState extends State<TripRequestScreen> {
       child: Container(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10), decoration: BoxDecoration(color: Colors.white, border: Border.all(color: primaryGreen.withOpacity(0.5)), borderRadius: BorderRadius.circular(8)), child: Text('+ $label', style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.w500))),
     );
   }
-
   Widget _buildSelectedChip(BuildContext context, String label) {
     return GestureDetector(
       onTap: () => context.read<TripProvider>().toggleInterest(label),

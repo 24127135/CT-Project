@@ -2,19 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../providers/trip_provider.dart';
+import '../screens/home_screen.dart';
 import 'trip_info_waiting_screen.dart';
 import 'home_screen.dart'; // Import HomePage
 
 class TripConfirmScreen extends StatefulWidget {
   const TripConfirmScreen({super.key});
-
   @override
   State<TripConfirmScreen> createState() => _TripConfirmScreenState();
 }
 
 class _TripConfirmScreenState extends State<TripConfirmScreen> {
   final TextEditingController _tripNameController = TextEditingController();
-
   final Color primaryGreen = const Color(0xFF4CAF50);
   final Color darkGreen = const Color(0xFF388E3C);
   final Color cardBackground = const Color(0xFFC8D7C8);
@@ -25,17 +24,12 @@ class _TripConfirmScreenState extends State<TripConfirmScreen> {
     final tripData = context.read<TripProvider>();
     _tripNameController.text = tripData.tripName;
   }
-
   @override
-  void dispose() {
-    _tripNameController.dispose();
-    super.dispose();
-  }
+  void dispose() { _tripNameController.dispose(); super.dispose(); }
 
   @override
   Widget build(BuildContext context) {
     final tripData = context.watch<TripProvider>();
-
     String displayDate = 'Chưa chọn';
     if (tripData.startDate != null && tripData.endDate != null) {
       String start = DateFormat('dd/MM/yyyy').format(tripData.startDate!);
@@ -45,6 +39,7 @@ class _TripConfirmScreenState extends State<TripConfirmScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        // Nút Hủy về Home
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () {
@@ -56,17 +51,9 @@ class _TripConfirmScreenState extends State<TripConfirmScreen> {
             );
           },
         ),
-        title: const Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Thông tin chuyến đi', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
-            Text('Bước 5/5', style: TextStyle(color: Colors.white70, fontSize: 14)),
-          ],
-        ),
-        backgroundColor: darkGreen,
-        elevation: 0,
+        title: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('Thông tin chuyến đi', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)), Text('Bước 5/5', style: TextStyle(color: Colors.white70, fontSize: 14))]),
+        backgroundColor: darkGreen, elevation: 0,
       ),
-
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -118,7 +105,6 @@ class _TripConfirmScreenState extends State<TripConfirmScreen> {
           ],
         ),
       ),
-
       bottomNavigationBar: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Row(
@@ -162,18 +148,7 @@ class _TripConfirmScreenState extends State<TripConfirmScreen> {
       ),
     );
   }
-
   Widget _buildSummaryItem(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: TextStyle(color: Colors.green.shade800, fontWeight: FontWeight.bold, fontSize: 15)),
-          const SizedBox(height: 2),
-          Text(value, style: TextStyle(color: Colors.grey.shade700, fontSize: 15, height: 1.3)),
-        ],
-      ),
-    );
+    return Padding(padding: const EdgeInsets.only(bottom: 12.0), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(label, style: TextStyle(color: Colors.green.shade800, fontWeight: FontWeight.bold, fontSize: 15)), const SizedBox(height: 2), Text(value, style: TextStyle(color: Colors.grey.shade700, fontSize: 15, height: 1.3))]));
   }
 }
