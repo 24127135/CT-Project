@@ -1,202 +1,115 @@
-# ############################
-# ## GENERAL / OS / IDE
-# ############################
-**/__pycache__/
-
-# Ignore specific frontend files often managed by package managers/IDEs
-frontend/.metadata
-frontend/pubspec.lock
-
-# Ignore test directories that don't need to be committed
-frontend/test/
-# Operating System files
+# ==========================
+# GLOBAL / OS / IDE
+# ==========================
 .DS_Store
-
-# Windows
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
 desktop.ini
 
-# Visual Studio Code
+# VS Code & IDEs
 .vscode/
-
-# JetBrains / IntelliJ / Android Studio
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
 .idea/
 *.iml
-*.ipr
 *.iws
+*.ipr
+out/
+.metadata
 
-# Editor swap/temp files
-*~
-# vim
-*.swp
-
-# Path is specified as /backend/
-/backend/venv/
-/backend/*.pyc
-/backend/__pycache__/
-/backend/*.egg-info/
-/backend/*.egg
-/__pycache__/ 
-*.pyc
-
-# Secrets
-/backend/.env
-#/backend/*.env.*
-/backend/*.ini
-#############################
-# Python / Django
-#############################
-
-# Byte-compiled / optimized / DLL files
-__pycache__/
-*.py[cod]
-*$py.class
-
-# Distribution / packaging
-*.egg-info/
-*.egg
-dist/
-build/
-
-# Virtual environments
-env/
-venv/
-.venv/
-ENV/
-env.bak/
-backend/venv/
-backend/.venv/
-
-# Test / coverage
-.pytest_cache/
-.cache/
-htmlcov/
-coverage.xml
-.coverage
-
-# Type checkers
-.mypy_cache/
-.pytype/
-
-# Django
-/backend/db.sqlite3
-*.sqlite3
-*.sqlite3-journal
-/backend/*.sqlite3
-media/
-staticfiles/
-local_settings.py
-
-# Secrets / config
-.env
-.env.*
-backend/.env
-backend/*.env.*
-*.key
-*.pem
-
-# Migration compiled files
-**/migrations/*.pyc
-
-#############################
-# Flutter / Dart / Mobile
-#############################
-
-# Dart / Flutter tooling
-.dart_tool/
-.packages
-/.pub-cache/
-.flutter-plugins
-.flutter-plugins-dependencies
-/.flutter-plugins
-
-# Build outputs
-/frontend/build/
-<<<<<<< HEAD
-/frontend/.dart_tool/
-/frontend/.flutter-plugins
-/frontend/.flutter-plugins-dependencies
-/frontend/.packages
-/frontend/ios/Pods/
-/frontend/ios/.symlinks/
-/frontend/ios/Flutter/App.framework
-/frontend/ios/Flutter/engine.framework
-/frontend/ios/Flutter/Flutter.podspec
-<<<<<<< HEAD
-=======
-=======
-/build/
-**/build/
-
-# Android
-**/android/.gradle/
-**/android/local.properties
-.gradle/
-android/.gradle/
-local.properties
-*.keystore
-*.jks
-
-# iOS
-**/ios/Pods/
-**/ios/.symlinks/
-**/ios/Flutter/App.framework
-**/ios/Flutter/engine.framework
-**/ios/Runner.xcworkspace/
-*.xcworkspace
-*.xcuserstate
-*.xcuserdata
-DerivedData/
-
-# macOS/Flutter ephemeral
-macos/Flutter/ephemeral/
-
-# Web
-/.dart_tool/
-/.dart_tool/**
-
-#############################
-# Node / JS (if present)
-#############################
-
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-#############################
-# Build / Temp / Logs
-#############################
-
+# ==========================
+# LOGS & TEMP 
+# ==========================
 *.log
 *.tmp
 *.temp
 tmp/
 temp/
 reports/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-#############################
-# OS-specific IDE files and misc
-#############################
+# ==========================
+# DATABASE / LOCAL FILES
+# ==========================
 
-# Thumbnails, caches
-Thumbs.db
-.DS_Store
-
-# JetBrains caches
-.idea/
-
-# Secrets and keys
-*.pem
-*.p12
-*.pfx
-private.key
-secret_key*
-
-# Ignore compiled C extensions
-*.so
-
-# Ignore any database in project root or subfolders
 *.db
->>>>>>> TripInfo
->>>>>>> 2a1ae0086ee58b6ff0f39518e46deb3bce07d91a
+*.sqlite3
+*.sqlite3-journal
+db.sqlite3
+
+# ==========================
+# PYTHON / DJANGO (Backend)
+# ==========================
+**/__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environments
+venv/
+env/
+.venv/
+backend/venv/
+backend/.venv/
+
+# Django Media (User uploads)
+backend/media/
+!backend/media/.gitkeep
+
+# Static files (Collected)
+backend/staticfiles/
+local_settings.py
+
+# ==========================
+# FLUTTER / DART (Frontend)
+# ==========================
+# Build artifacts & Tools
+**/build/
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+
+# Node modules 
+node_modules/
+
+# frontend/test/
+
+# Android specific
+**/android/local.properties
+**/android/.gradle/
+**/android/key.properties
+**/android/*.keystore
+**/android/*.jks
+
+# iOS specific
+**/ios/.symlinks/
+**/ios/Pods/
+**/ios/Flutter/App.framework
+**/ios/Flutter/engine.framework
+**/ios/Flutter/Flutter.podspec
+**/ios/DerivedData/
+
+# Web specific
+lib/generated_plugin_registrant.dart
+
+# ==========================
+# SECURITY / ENV 
+# ==========================
+.env
+.env.*
+backend/.env
+backend/*.env
+frontend/.env
+*.pem
+*.key
+*.p12
