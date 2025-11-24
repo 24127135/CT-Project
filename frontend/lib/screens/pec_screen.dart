@@ -84,7 +84,13 @@ class PecScreen extends StatelessWidget {
   }
 
   Widget _buildCategoryTabs(BuildContext context, PecProvider pecProvider) {
-    final categories = ['Quần áo', 'Phụ kiện', 'Dụng cụ', 'Thực phẩm'];
+    final Map<String, IconData> categories = {
+      'Quần áo': Icons.checkroom,
+      'Phụ kiện': Icons.watch,
+      'Dụng cụ': Icons.backpack,
+      'Thực phẩm': Icons.restaurant,
+    };
+    
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
@@ -92,7 +98,9 @@ class PecScreen extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
-        children: categories.map((cat) {
+        children: categories.entries.map((entry) {
+          final cat = entry.key;
+          final icon = entry.value;
           final isSelected = pecProvider.selectedCategory == cat;
           return Expanded(
             child: GestureDetector(
@@ -104,13 +112,24 @@ class PecScreen extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 alignment: Alignment.center,
-                child: Text(
-                  cat,
-                  style: TextStyle(
-                    color: isSelected ? Colors.white : const Color(0xFF666666),
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                    fontSize: 14,
-                  ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      icon,
+                      color: isSelected ? Colors.white : const Color(0xFF666666),
+                      size: 20,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      cat,
+                      style: TextStyle(
+                        color: isSelected ? Colors.white : const Color(0xFF666666),
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -234,6 +253,10 @@ class PecScreen extends StatelessWidget {
   }
 
   Widget _buildItemList(BuildContext context, PecProvider pecProvider) {
+    if (pecProvider.items.isEmpty) {
+      return _buildEmptyState();
+    }
+    
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       itemCount: pecProvider.items.length,
@@ -241,6 +264,38 @@ class PecScreen extends StatelessWidget {
         final item = pecProvider.items[index];
         return PecItemWidget(item: item);
       },
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.search_off,
+            size: 80,
+            color: Colors.grey.shade300,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Không tìm thấy đồ dùng',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: darkText,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Thử tìm kiếm với từ khóa khác',
+            style: TextStyle(
+              fontSize: 14,
+              color: lightText,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
