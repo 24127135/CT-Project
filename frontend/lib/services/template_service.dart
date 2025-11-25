@@ -4,16 +4,29 @@ import 'token_service.dart';
 import '../models/trip_template.dart';
 
 class TemplateService {
-  // Adjust IP as needed (10.0.2.2 for Emulator, LAN IP for real device)
-  static const String baseUrl = 'http://10.0.2.2:8000/api/auth/templates/';
+  // ---------------------------------------------------------
+  // BƯỚC 1: CẤU HÌNH IP
+  // Nếu chạy máy ảo Android: dùng 10.0.2.2
+  // Nếu chạy máy thật: dùng IP máy tính (VD: 192.168.1.12)
+  // ---------------------------------------------------------
+  static const String _serverIp = '10.0.2.2'; // Đổi thành IP LAN nếu chạy máy thật
+  static const String baseUrl = 'http://$_serverIp:8000/api/auth/templates/';
+  // LƯU Ý: Kiểm tra lại xem backend của bạn là 'api/auth/templates/'
+  // hay là 'api/templates/' hay 'api/history-inputs/'?
+
   final TokenService _tokenService = TokenService();
 
-  // 1. GET: Fetch list of templates
+  // 1. GET: Lấy danh sách mẫu
   Future<List<TripTemplate>> getTemplates() async {
     final token = await _tokenService.getToken();
+    print("==== TOKEN ====");
+    print(token);
+    // Debug log
+    print("GET Templates - Token: ${token != null ? 'Có' : 'Không'}");
     if (token == null) return [];
 
     try {
+      print("Đang gọi API: $baseUrl");
       final response = await http.get(
         Uri.parse(baseUrl),
         headers: {
@@ -22,25 +35,36 @@ class TemplateService {
         },
       );
 
+      print("Response Code: ${response.statusCode}");
+
       if (response.statusCode == 200) {
-        final List<dynamic> data = jsonDecode(response.body);
+        // Fix lỗi charset nếu bị lỗi font tiếng Việt
+        String responseBody = utf8.decode(response.bodyBytes);
+        final List<dynamic> data = jsonDecode(responseBody);
         return data.map((json) => TripTemplate.fromJson(json)).toList();
       } else {
-        print('Failed to load templates: ${response.body}');
+        print('Lỗi Server: ${response.body}');
         return [];
       }
     } catch (e) {
-      print('Error fetching templates: $e');
+      print('Lỗi kết nối (GET): $e');
       return [];
     }
   }
 
-  // 2. POST: Save a new template
+  // 2. POST: Lưu mẫu mới
   Future<bool> saveTemplate(Map<String, dynamic> templateData) async {
     final token = await _tokenService.getToken();
-    if (token == null) return false;
+
+    if (token == null) {
+      print("Lỗi: Chưa đăng nhập (Token null)");
+      return false;
+    }
 
     try {
+      print("Đang POST tới: $baseUrl");
+      print("Dữ liệu gửi đi: ${jsonEncode(templateData)}");
+
       final response = await http.post(
         Uri.parse(baseUrl),
         headers: {
@@ -50,18 +74,25 @@ class TemplateService {
         body: jsonEncode(templateData),
       );
 
-      if (response.statusCode == 201) {
+      print("POST Status Code: ${response.statusCode}");
+
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        print("✅ Lưu thành công!");
         return true;
       } else {
-        // Throw exception to show specific error message from backend (e.g., duplicate name)
-        final errorData = jsonDecode(response.body);
-        if (errorData['name'] != null) {
-          throw Exception(errorData['name'][0]);
+        // In chi tiết lỗi từ Backend
+        print("❌ Lưu thất bại. Server phản hồi: ${response.body}");
+
+        // Thử throw exception để UI hiện thông báo
+        final errorData = jsonDecode(utf8.decode(response.bodyBytes));
+        if (errorData is Map && errorData['name'] != null) {
+          throw Exception("Tên mẫu này đã tồn tại, vui lòng chọn tên khác.");
         }
-        throw Exception('Lỗi không xác định khi lưu mẫu');
+        throw Exception('Lỗi Server: ${response.statusCode}');
       }
     } catch (e) {
-      rethrow; // Let the Provider/UI handle the error display
+      print('❌ Lỗi kết nối (POST): $e');
+      rethrow;
     }
   }
 }

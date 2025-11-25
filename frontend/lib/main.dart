@@ -1,17 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'screens/welcome_view.dart';
 import 'screens/home_screen.dart';
-import 'package:provider/provider.dart';
-import 'providers/trip_provider.dart'; // Đảm bảo đường dẫn này trỏ tới file TripProvider ở trên
-
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'providers/trip_provider.dart';
 import 'core/supabase_config.dart';
-import 'dart:async';
-// import 'package:your_app_name/core/app.dart';
-
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Khởi tạo Supabase
   await Supabase.initialize(
     url: supabaseUrl,
     anonKey: supabaseAnonKey,
@@ -20,7 +18,6 @@ Future<void> main() async {
   runApp(
     MultiProvider(
       providers: [
-        // SỬ DỤNG Constructor không tham số (phù hợp với file TripProvider đã sửa)
         ChangeNotifierProvider(create: (_) => TripProvider()),
       ],
       child: const MyApp(),
@@ -45,7 +42,8 @@ class MyApp extends StatelessWidget {
         fontFamily: 'Roboto',
         useMaterial3: true,
       ),
-      home: AuthGate(child: const WelcomeView()),
+      // Thay vì gán cứng AuthGate(child: WelcomeView), ta để AuthGate tự quyết định
+      home: const AuthGate(),
       routes: {
         '/welcome': (_) => const WelcomeView(),
         '/home': (_) => const HomePage(),
@@ -54,58 +52,37 @@ class MyApp extends StatelessWidget {
   }
 }
 
-class AuthGate extends StatefulWidget {
-  final Widget child;
-  const AuthGate({required this.child, super.key});
-
-  @override
-  State<AuthGate> createState() => _AuthGateState();
-}
-
-class _AuthGateState extends State<AuthGate> {
-  Session? _session;
-  late final StreamSubscription _sub;
-
-  @override
-  void initState() {
-    super.initState();
-    _session = Supabase.instance.client.auth.currentSession;
-    // Listen for auth state changes
-    _sub = Supabase.instance.client.auth.onAuthStateChange.listen((event) {
-      final session = (event as dynamic).session as Session?;
-      setState(() => _session = session);
-      // Use post frame callback to ensure Navigator is available
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        if (session != null) {
-          Navigator.of(context).pushReplacementNamed('/home');
-        } else {
-          Navigator.of(context).pushReplacementNamed('/welcome');
-        }
-      });
-    });
-    // Ensure initial navigation reflects current session
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      if (_session != null) {
-        Navigator.of(context).pushReplacementNamed('/home');
-      } else {
-        Navigator.of(context).pushReplacementNamed('/welcome');
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _sub.cancel();
-    super.dispose();
-  }
+/// AUTHGATE: Cổng kiểm soát đăng nhập
+/// - Nếu có Session -> Vào thẳng HomePage
+/// - Nếu chưa -> Vào WelcomeView
+class AuthGate extends StatelessWidget {
+  const AuthGate({super.key});
 
   @override
   Widget build(BuildContext context) {
-    if (_session != null) {
-      return const HomePage();
-    }
-    return widget.child;
+    return StreamBuilder<AuthState>(
+      // Lắng nghe luồng sự kiện Auth của Supabase
+      stream: Supabase.instance.client.auth.onAuthStateChange,
+      builder: (context, snapshot) {
+        // 1. Trạng thái chờ: Đang tải dữ liệu (tránh màn hình trắng)
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        // 2. Lấy session hiện tại
+        // Stream trả về AuthState, trong đó có chứa session
+        final session = snapshot.data?.session;
+
+        if (session != null) {
+          // Đã đăng nhập -> Vào Home
+          return const HomePage();
+        } else {
+          // Chưa đăng nhập (hoặc hết hạn) -> Vào Welcome/Login
+          return const WelcomeView();
+        }
+      },
+    );
   }
 }

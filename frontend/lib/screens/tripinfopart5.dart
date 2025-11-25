@@ -3,9 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../providers/trip_provider.dart';
 import '../screens/home_screen.dart';
-import '../services/supabase_db_service.dart';
 import 'trip_info_waiting_screen.dart';
-import 'home_screen.dart'; // Import HomePage
 
 class TripConfirmScreen extends StatefulWidget {
   const TripConfirmScreen({super.key});
@@ -15,6 +13,8 @@ class TripConfirmScreen extends StatefulWidget {
 
 class _TripConfirmScreenState extends State<TripConfirmScreen> {
   final TextEditingController _tripNameController = TextEditingController();
+
+  // Màu sắc theo thiết kế cũ của bạn
   final Color primaryGreen = const Color(0xFF4CAF50);
   final Color darkGreen = const Color(0xFF388E3C);
   final Color cardBackground = const Color(0xFFC8D7C8);
@@ -40,19 +40,23 @@ class _TripConfirmScreenState extends State<TripConfirmScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        // Nút Hủy về Home
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () {
-            // FIXED: Top Left goes to Home
             Navigator.pushAndRemoveUntil(
               context,
               MaterialPageRoute(builder: (context) => const HomePage()),
-              (route) => false,
+                  (route) => false,
             );
           },
         ),
-        title: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('Thông tin chuyến đi', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)), Text('Bước 5/5', style: TextStyle(color: Colors.white70, fontSize: 14))]),
+        title: const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Thông tin chuyến đi', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+              Text('Bước 5/5', style: TextStyle(color: Colors.white70, fontSize: 14))
+            ]
+        ),
         backgroundColor: darkGreen, elevation: 0,
       ),
       body: SingleChildScrollView(
@@ -106,54 +110,68 @@ class _TripConfirmScreenState extends State<TripConfirmScreen> {
           ],
         ),
       ),
+
+      // --- PHẦN NÀY ĐÃ ĐƯỢC QUAY VỀ GIAO DIỆN CŨ ---
       bottomNavigationBar: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Row(
           children: [
+            // 1. Nút Back nhỏ bên trái
             Container(
               width: 48, height: 48,
               decoration: BoxDecoration(color: Colors.white, border: Border.all(color: Colors.grey.shade300), borderRadius: BorderRadius.circular(8), boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 2, offset: Offset(0,1))]),
               child: IconButton(
                 icon: const Icon(Icons.arrow_back_ios_new, size: 20, color: Colors.black87),
-                onPressed: () => Navigator.pop(context), // Bottom Left Button (Back to Step 4)
+                onPressed: () => Navigator.pop(context),
               ),
             ),
             const SizedBox(width: 12),
+
+            // 2. Nút "Lưu mẫu này" (Màu trắng, chữ đen) - ĐÃ GẮN LOGIC MỚI
             Expanded(
               child: ElevatedButton(
                 onPressed: () async {
-                  // Save template using Supabase DB service (client-side)
                   try {
-                    String tName = tripData.tripName.isEmpty ? "Mẫu mới ${DateTime.now().minute}" : tripData.tripName;
+                    // Lấy tên từ ô nhập liệu
+                    String tName = _tripNameController.text.isEmpty ? "Mẫu mới" : _tripNameController.text;
 
-                    final db = SupabaseDbService();
-                    await db.saveHistoryInput(tName, {
-                      'searchLocation': tripData.searchLocation,
-                      'startDate': tripData.startDate?.toIso8601String(),
-                      'endDate': tripData.endDate?.toIso8601String(),
-                      'durationDays': tripData.durationDays,
-                      'accommodation': tripData.accommodation,
-                      'paxGroup': tripData.paxGroup,
-                      'difficultyLevel': tripData.difficultyLevel,
-                      'note': tripData.note,
-                      'selectedInterests': tripData.selectedInterests,
-                      'tripName': tripData.tripName,
-                    });
-
+                    // Hiện thông báo đang xử lý
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Đã lưu mẫu thành công!'), backgroundColor: Colors.green),
+                      const SnackBar(content: Text('Đang lưu mẫu...'), duration: Duration(milliseconds: 800)),
                     );
+
+                    // GỌI PROVIDER (Logic đúng đã fix)
+                    await context.read<TripProvider>().saveHistoryInput(tName);
+
+                    // Thông báo thành công
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('✅ Đã lưu mẫu thành công!'), backgroundColor: Colors.green),
+                      );
+                      print("Lưu mẫu thành công!");
+                    }
                   } catch (e) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Lỗi khi lưu: $e'), backgroundColor: Colors.red),
-                    );
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Lỗi: $e'), backgroundColor: Colors.red),
+                      );
+                    }
                   }
                 },
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black87, padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: BorderSide(color: Colors.grey.shade300)), elevation: 1),
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: Colors.black87,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: BorderSide(color: Colors.grey.shade300)),
+                    elevation: 1
+                ),
                 child: const Text('Lưu mẫu này', style: TextStyle(fontWeight: FontWeight.bold)),
               ),
             ),
+
             const SizedBox(width: 12),
+
+            // 3. Nút "Xác nhận" (Màu xanh) - CHỈ CHUYỂN TRANG
             Expanded(
               child: ElevatedButton(
                 onPressed: () {
@@ -168,6 +186,7 @@ class _TripConfirmScreenState extends State<TripConfirmScreen> {
       ),
     );
   }
+
   Widget _buildSummaryItem(String label, String value) {
     return Padding(padding: const EdgeInsets.only(bottom: 12.0), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(label, style: TextStyle(color: Colors.green.shade800, fontWeight: FontWeight.bold, fontSize: 15)), const SizedBox(height: 2), Text(value, style: TextStyle(color: Colors.grey.shade700, fontSize: 15, height: 1.3))]));
   }

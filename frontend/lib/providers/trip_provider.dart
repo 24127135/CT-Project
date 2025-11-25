@@ -98,15 +98,6 @@ class TripProvider with ChangeNotifier {
   Future<void> saveHistoryInput(String name) async {
     if (_searchLocation.isEmpty || _accommodation == null || _paxGroup == null || _difficultyLevel == null) {
       throw Exception("Vui lòng điền đầy đủ thông tin trước khi lưu.");
-    
-    final qp = <String, dynamic>{};
-    queryParams.forEach((k, v) {
-    if (v is List) qp[k] = v.map((e) => e.toString()).toList();
-      else qp[k] = v.toString();
-    });
-
-    final res = await _api.fetchSuggestedRoutes(qp);
-    return res;
     }
 
     final templateData = {
