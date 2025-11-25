@@ -58,8 +58,8 @@ class TripProvider with ChangeNotifier {
   void setTripName(String value) { _tripName = value; notifyListeners(); }
 
   void setTripDates(DateTime start, DateTime end) {
-    _startDate = start;
-    _endDate = end;
+    _startDate = DateTime(start.year, start.month, start.day);
+    _endDate = DateTime(end.year, end.month, end.day);
     notifyListeners();
   }
 
@@ -83,9 +83,10 @@ class TripProvider with ChangeNotifier {
     _tripName = template.name;
 
     final now = DateTime.now();
-    _startDate = now.add(const Duration(days: 1)); 
-    _endDate = _startDate!.add(Duration(days: template.durationDays - 1));
-
+    final today = DateTime(now.year, now.month, now.day);
+    _startDate = today.add(const Duration(days: 1));
+    int d = template.durationDays < 1 ? 1 : template.durationDays;
+    _endDate = _startDate!.add(Duration(days: d - 1));
     notifyListeners();
   }
 

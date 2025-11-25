@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/trip_provider.dart';
-import '../utils/vietnam_data.dart'; 
+import '../utils/vietnam_data.dart';
 import 'tripinfopart2.dart';
-import 'home_screen.dart'; // Import HomePage
+import 'home_screen.dart';
 
 class TripInfoScreen extends StatelessWidget {
   const TripInfoScreen({super.key});
@@ -18,11 +18,11 @@ class TripInfoScreen extends StatelessWidget {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () {
-            // FIXED: Go straight back to Home (Cancel Wizard)
+            // Hủy wizard, quay về Home
             Navigator.pushAndRemoveUntil(
               context,
               MaterialPageRoute(builder: (context) => const HomePage()),
-              (route) => false,
+                  (route) => false,
             );
           },
         ),
@@ -53,21 +53,22 @@ class TripInfoScreen extends StatelessWidget {
                   children: [
                     _buildChoiceButton(
                       label: 'Cắm trại',
-                      isSelected: tripData.accommodation == 'Cắm trại',
+                      // FIXED: Dùng contains để khớp dữ liệu linh hoạt hơn
+                      isSelected: tripData.accommodation?.contains('Cắm trại') ?? false,
                       onTap: () => context.read<TripProvider>().setAccommodation('Cắm trại'),
                       primaryGreen: primaryGreen,
                     ),
                     const SizedBox(height: 12),
                     _buildChoiceButton(
                       label: 'Homestay',
-                      isSelected: tripData.accommodation == 'Homestay',
+                      isSelected: tripData.accommodation?.contains('Homestay') ?? false,
                       onTap: () => context.read<TripProvider>().setAccommodation('Homestay'),
                       primaryGreen: primaryGreen,
                     ),
                     const SizedBox(height: 12),
                     _buildChoiceButton(
                       label: 'Kết hợp',
-                      isSelected: tripData.accommodation == 'Kết hợp',
+                      isSelected: tripData.accommodation?.contains('Kết hợp') ?? false,
                       onTap: () => context.read<TripProvider>().setAccommodation('Kết hợp'),
                       primaryGreen: primaryGreen,
                     ),
@@ -82,21 +83,22 @@ class TripInfoScreen extends StatelessWidget {
                   children: [
                     _buildChoiceButton(
                       label: 'Đơn lẻ (1-2 người)',
-                      isSelected: tripData.paxGroup == 'Đơn lẻ (1-2 người)',
+                      // FIXED: Kiểm tra null và dùng contains để khớp từ khóa chính
+                      isSelected: tripData.paxGroup != null && tripData.paxGroup!.contains('Đơn lẻ'),
                       onTap: () => context.read<TripProvider>().setPaxGroup('Đơn lẻ (1-2 người)'),
                       primaryGreen: primaryGreen,
                     ),
                     const SizedBox(height: 12),
                     _buildChoiceButton(
                       label: 'Nhóm nhỏ (3-6 người)',
-                      isSelected: tripData.paxGroup == 'Nhóm nhỏ (3-6 người)',
+                      isSelected: tripData.paxGroup != null && tripData.paxGroup!.contains('Nhóm nhỏ'),
                       onTap: () => context.read<TripProvider>().setPaxGroup('Nhóm nhỏ (3-6 người)'),
                       primaryGreen: primaryGreen,
                     ),
                     const SizedBox(height: 12),
                     _buildChoiceButton(
                       label: 'Nhóm đông (7+ người)',
-                      isSelected: tripData.paxGroup == 'Nhóm đông (7+ người)',
+                      isSelected: tripData.paxGroup != null && tripData.paxGroup!.contains('Nhóm đông'),
                       onTap: () => context.read<TripProvider>().setPaxGroup('Nhóm đông (7+ người)'),
                       primaryGreen: primaryGreen,
                     ),
@@ -172,7 +174,9 @@ class _LocationInput extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final initialValue = context.read<TripProvider>().searchLocation;
+    // FIXED: Dùng context.watch để giá trị cập nhật ngay khi applyTemplate
+    final initialValue = context.watch<TripProvider>().searchLocation;
+
     return Autocomplete<String>(
       initialValue: TextEditingValue(text: initialValue),
       optionsBuilder: (TextEditingValue textEditingValue) {
@@ -189,6 +193,11 @@ class _LocationInput extends StatelessWidget {
         FocusScope.of(context).unfocus();
       },
       fieldViewBuilder: (context, textEditingController, focusNode, onFieldSubmitted) {
+        // FIXED: Cần cập nhật controller nếu giá trị khởi tạo thay đổi (khi load template)
+        if (textEditingController.text != initialValue && initialValue.isNotEmpty) {
+          textEditingController.text = initialValue;
+        }
+
         return TextField(
           controller: textEditingController,
           focusNode: focusNode,

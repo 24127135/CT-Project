@@ -28,8 +28,8 @@ class TripTemplate {
       name: json['name'] ?? '',
       location: json['location'] ?? '',
       accommodation: json['accommodation'] ?? '',
-      paxGroup: json['pax_group'] ?? '', // Note: backend uses snake_case
-      durationDays: json['duration_days'] ?? 1,
+      paxGroup: json['pax_group'] ?? json['paxGroup'] ?? '',
+      durationDays: json['duration_days'] ?? json['durationDays'] ?? 1,
       difficulty: json['difficulty'] ?? '',
       note: json['note'] ?? '',
       interests: List<String>.from(json['interests'] ?? []),
