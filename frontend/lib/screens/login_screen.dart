@@ -4,8 +4,8 @@ import '../widgets/custom_button.dart';
 import '../utils/app_colors.dart';
 import '../utils/app_styles.dart';
 import '../services/auth_service.dart';
-import 'otp_verification_screen.dart';
 import 'signup_screen.dart';
+import 'otp_verification_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -39,23 +39,31 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     setState(() => _isLoading = true);
-    // Call the actual backend service
-    final success = await _authService.login(email, password);
-
-    if (mounted) setState(() => _isLoading = false);
-
-    if (success) {
-      if (!mounted) return;
-      // Navigate to OTP Screen on success
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => OtpVerificationScreen(email: email)),
-      );
-    } else {
+    try {
+      final hasSession = await _authService.login(email, password);
+      if (hasSession) {
+        if (!mounted) return;
+        Navigator.of(context).pushReplacementNamed('/home');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Đăng nhập thành công')),
+        );
+        return;
+      } else {
+        // No session: likely passwordless/OTP flow — navigate to OTP verification.
+        if (!mounted) return;
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => OtpVerificationScreen(email: email)),
+        );
+        return;
+      }
+    } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Đăng nhập thất bại. Vui lòng kiểm tra email hoặc mật khẩu.'), backgroundColor: Colors.red),
+        SnackBar(content: Text('Đăng nhập thất bại: $e'), backgroundColor: Colors.red),
       );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 

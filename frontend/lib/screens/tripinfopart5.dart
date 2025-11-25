@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../providers/trip_provider.dart';
 import '../screens/home_screen.dart';
+import '../services/supabase_db_service.dart';
 import 'trip_info_waiting_screen.dart';
 import 'home_screen.dart'; // Import HomePage
 
@@ -121,12 +122,31 @@ class _TripConfirmScreenState extends State<TripConfirmScreen> {
             Expanded(
               child: ElevatedButton(
                 onPressed: () async {
+                  // Save template using Supabase DB service (client-side)
                   try {
                     String tName = tripData.tripName.isEmpty ? "Mẫu mới ${DateTime.now().minute}" : tripData.tripName;
-                    await context.read<TripProvider>().saveHistoryInput(tName);
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Đã lưu mẫu thành công!'), backgroundColor: Colors.green));
+
+                    final db = SupabaseDbService();
+                    await db.saveHistoryInput(tName, {
+                      'searchLocation': tripData.searchLocation,
+                      'startDate': tripData.startDate?.toIso8601String(),
+                      'endDate': tripData.endDate?.toIso8601String(),
+                      'durationDays': tripData.durationDays,
+                      'accommodation': tripData.accommodation,
+                      'paxGroup': tripData.paxGroup,
+                      'difficultyLevel': tripData.difficultyLevel,
+                      'note': tripData.note,
+                      'selectedInterests': tripData.selectedInterests,
+                      'tripName': tripData.tripName,
+                    });
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Đã lưu mẫu thành công!'), backgroundColor: Colors.green),
+                    );
                   } catch (e) {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Lỗi khi lưu: $e'), backgroundColor: Colors.red));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Lỗi khi lưu: $e'), backgroundColor: Colors.red),
+                    );
                   }
                 },
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black87, padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: BorderSide(color: Colors.grey.shade300)), elevation: 1),

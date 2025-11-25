@@ -17,6 +17,7 @@ dependencies:
 # Connect to django
   http: ^1.2.0
   provider: ^6.0.0
+  supabase_flutter: ^2.10.3
 
 dev_dependencies:
   flutter_test:

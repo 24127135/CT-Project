@@ -1,98 +1,125 @@
 import 'package:dio/dio.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ApiService {
-  // 1. ĐỊA CHỈ IP CỦA BACKEND DJANGO
-  //    Hãy đảm bảo đây là IP mạng của máy tính chạy server Django.
-  //    KHÔNG dùng 'localhost' hay '127.0.0.1'
+  // Base URL of your Django backend
   static const String _baseUrl = 'http://192.168.0.12:8000';
 
-  // 2. TẠO CÁC BIẾN CẦN THIẾT
   final Dio _dio = Dio(BaseOptions(baseUrl: _baseUrl));
-  final FlutterSecureStorage _storage = const FlutterSecureStorage();
 
-  // 3. HÀM ĐĂNG KÝ (REGISTER)
+  ApiService() {
+    // Attach interceptor to add Authorization header from Supabase session
+    _dio.interceptors.add(InterceptorsWrapper(
+      onRequest: (options, handler) async {
+        try {
+          final session = Supabase.instance.client.auth.currentSession;
+          final token = session?.accessToken;
+          if (token != null) {
+            options.headers['Authorization'] = 'Bearer $token';
+          }
+        } catch (_) {
+          // ignore
+        }
+        return handler.next(options);
+      },
+      onError: (err, handler) async {
+        // If unauthorized, try to get a refreshed token from Supabase and retry once
+        if (err.response?.statusCode == 401) {
+          try {
+            final session = Supabase.instance.client.auth.currentSession;
+            final token = session?.accessToken;
+            if (token != null) {
+              final opts = err.requestOptions;
+              opts.headers['Authorization'] = 'Bearer $token';
+              final cloneReq = await _dio.fetch(opts);
+              return handler.resolve(cloneReq);
+            }
+          } catch (_) {
+            // ignore retry errors
+          }
+        }
+        return handler.next(err);
+      },
+    ));
+  }
+
+  // Register (keeps calling backend endpoint; backend may or may not be used once you migrate fully to Supabase)
   Future<bool> register({
     required String email,
     required String fullName,
     required String password,
   }) async {
     try {
-      // Gửi yêu cầu POST đến API Đăng ký
       await _dio.post(
-        '/api/users/register/', // Đường dẫn API
+        '/api/users/register/',
         data: {
           'email': email,
-          'full_name': fullName, // Giống hệt key trong Django Serializer
+          'full_name': fullName,
           'password': password,
-          'password_confirm': password, // Giả sử pass và confirm giống nhau
+          'password_confirm': password,
         },
       );
-      
-      // Nếu không có lỗi, đăng ký thành công
-      print('Đăng ký thành công');
       return true;
-
     } on DioException catch (e) {
-      // Xử lý lỗi
-      print('Lỗi khi đăng ký: ${e.response?.data}');
+      print('Register error: ${e.response?.data}');
       return false;
     } catch (e) {
-      print('Lỗi không xác định: $e');
+      print('Unknown register error: $e');
       return false;
     }
   }
 
-  // 4. HÀM ĐĂNG NHẬP (LOGIN)
-  Future<bool> login({
-    required String email,
-    required String password,
-  }) async {
+  // Login (if you keep server-side login) — note: with Supabase auth you may not need this
+  Future<bool> login({required String email, required String password}) async {
     try {
-      // Gửi yêu cầu POST đến API Lấy Token
       final response = await _dio.post(
-        '/api/token/', // Đường dẫn API của Simple JWT
-        data: {
-          'email': email,
-          'password': password,
-        },
+        '/api/token/',
+        data: {'email': email, 'password': password},
       );
-
-      // Nếu thành công (status 200 OK)
-      if (response.statusCode == 200) {
-        // Lấy access và refresh token từ JSON trả về
-        final String accessToken = response.data['access'];
-        final String refreshToken = response.data['refresh'];
-
-        // Lưu token vào Secure Storage
-        await _storage.write(key: 'access_token', value: accessToken);
-        await _storage.write(key: 'refresh_token', value: refreshToken);
-        
-        print('Đăng nhập thành công, token đã được lưu.');
-        return true;
-      }
-      return false;
-
+      return response.statusCode == 200;
     } on DioException catch (e) {
-      // Xử lý lỗi (ví dụ: sai mật khẩu)
-      print('Lỗi khi đăng nhập: ${e.response?.data}');
+      print('Login error: ${e.response?.data}');
       return false;
     } catch (e) {
-      print('Lỗi không xác định: $e');
+      print('Unknown login error: $e');
       return false;
     }
   }
 
-  // 5. HÀM LẤY TOKEN (ĐỂ GỌI API ĐÃ XÁC THỰC)
-  Future<String?> getAccessToken() async {
-    return await _storage.read(key: 'access_token');
+  // Logout via Supabase
+  Future<void> logout() async {
+    await Supabase.instance.client.auth.signOut();
   }
 
-  // 6. HÀM ĐĂNG XUẤT (LOGOUT)
-  Future<void> logout() async {
-    // Xóa token khỏi storage
-    await _storage.delete(key: 'access_token');
-    await _storage.delete(key: 'refresh_token');
-    print('Đã đăng xuất.');
+  // Fetch suggested routes from backend with query parameters
+  Future<List<dynamic>> fetchSuggestedRoutes(Map<String, dynamic> queryParams) async {
+    try {
+      final response = await _dio.get('/api/routes/suggested/', queryParameters: queryParams);
+      return response.data as List<dynamic>;
+    } on DioException catch (e) {
+      print('fetchSuggestedRoutes error: ${e.response?.data}');
+      rethrow;
+    }
+  }
+
+  // Save history input template
+  Future<void> saveHistoryInput(Map<String, dynamic> body) async {
+    try {
+      await _dio.post('/api/history-inputs/', data: body);
+    } on DioException catch (e) {
+      print('saveHistoryInput error: ${e.response?.data}');
+      rethrow;
+    }
+  }
+
+  // Create plan
+  Future<dynamic> createPlan(Map<String, dynamic> body) async {
+    try {
+      final response = await _dio.post('/api/plans/', data: body);
+      return response.data;
+    } on DioException catch (e) {
+      print('createPlan error: ${e.response?.data}');
+      rethrow;
+    }
   }
 }

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import '../services/api_service.dart';
 import '../models/trip_template.dart';
 import '../services/template_service.dart';
 
@@ -12,7 +13,10 @@ class TripProvider with ChangeNotifier {
   
   static const String _baseUrl = 'http://$_serverIp:8000/api';
   
+  final ApiService _api = ApiService();
   final TemplateService _templateService = TemplateService();
+
+  TripProvider([String? unused]);
 
   // --- State Variables ---
   String _searchLocation = '';
@@ -94,6 +98,15 @@ class TripProvider with ChangeNotifier {
   Future<void> saveHistoryInput(String name) async {
     if (_searchLocation.isEmpty || _accommodation == null || _paxGroup == null || _difficultyLevel == null) {
       throw Exception("Vui lòng điền đầy đủ thông tin trước khi lưu.");
+    
+    final qp = <String, dynamic>{};
+    queryParams.forEach((k, v) {
+    if (v is List) qp[k] = v.map((e) => e.toString()).toList();
+      else qp[k] = v.toString();
+    });
+
+    final res = await _api.fetchSuggestedRoutes(qp);
+    return res;
     }
 
     final templateData = {
