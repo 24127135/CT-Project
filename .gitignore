@@ -54,7 +54,6 @@ db.sqlite3
 
 # Virtual Environments
 venv/
-env/
 .venv/
 backend/venv/
 backend/.venv/
