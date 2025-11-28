@@ -1,19 +1,10 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-// debugPrint is available from material.dart
 import '../models/trip_template.dart';
 import '../services/supabase_db_service.dart';
 
 class TripProvider with ChangeNotifier {
-  // --- CẤU HÌNH API ---
-  // FIXED: Gán cứng IP để tránh lỗi "No host specified". 
-  // Dùng '10.0.2.2' cho Android Emulator. Nếu chạy máy thật hãy thay bằng IP LAN (VD: 192.168.1.x)
-  static const String _serverIp = '10.0.2.2'; 
-  
-  static const String _baseUrl = 'http://$_serverIp:8000/api';
-  
-  
+
+  // Khởi tạo Service Supabase
   final SupabaseDbService _supabaseDb = SupabaseDbService();
 
   TripProvider([String? unused]);
@@ -27,7 +18,7 @@ class TripProvider with ChangeNotifier {
   String? _difficultyLevel;
   String _note = '';
   List<String> _selectedInterests = [];
-  String _tripName = ''; 
+  String _tripName = '';
 
   // --- Getters ---
   String get searchLocation => _searchLocation;
@@ -44,8 +35,7 @@ class TripProvider with ChangeNotifier {
     if (_startDate == null || _endDate == null) return 1;
     return _endDate!.difference(_startDate!).inDays + 1;
   }
-  
-  // Helper chuyển đổi nhóm người
+
   int get parsedGroupSize {
     if (_paxGroup == 'Đơn lẻ (1-2 người)') return 2;
     if (_paxGroup == 'Nhóm nhỏ (3-6 người)') return 5;
@@ -76,7 +66,7 @@ class TripProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  // --- FEATURE 1: APPLY TEMPLATE ---
+  // --- Logic Apply Template & History (Giữ nguyên) ---
   void applyTemplate(TripTemplate template) {
     _searchLocation = template.location;
     _accommodation = template.accommodation;
@@ -94,20 +84,15 @@ class TripProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  /// Apply a saved history input (from Supabase) to the provider state.
   void applyHistoryInput(Map<String, dynamic> data) {
     _searchLocation = data['location'] ?? data['payload']?['location'] ?? '';
     _accommodation = data['rest_type'] ?? data['payload']?['rest_type'];
 
     final gs = data['group_size'] ?? data['payload']?['group_size'];
     if (gs is int) {
-      if (gs >= 7) {
-        _paxGroup = 'Nhóm đông (7+ người)';
-      } else if (gs >= 3) {
-        _paxGroup = 'Nhóm nhỏ (3-6 người)';
-      } else {
-        _paxGroup = 'Đơn lẻ (1-2 người)';
-      }
+      if (gs >= 7) _paxGroup = 'Nhóm đông (7+ người)';
+      else if (gs >= 3) _paxGroup = 'Nhóm nhỏ (3-6 người)';
+      else _paxGroup = 'Đơn lẻ (1-2 người)';
     } else if (gs is String) {
       _paxGroup = gs;
     }
@@ -121,27 +106,22 @@ class TripProvider with ChangeNotifier {
         final d = (dd is int) ? dd : int.tryParse(dd?.toString() ?? '') ?? 1;
         _endDate = _startDate!.add(Duration(days: d - 1));
       } catch (_) {
-        _startDate = null;
-        _endDate = null;
+        _startDate = null; _endDate = null;
       }
     }
-
     _difficultyLevel = data['difficulty'] ?? data['payload']?['difficulty'];
-    final interests = data['personal_interests'] ?? data['payload']?['personal_interests'] ?? data['personal_interest'] ?? data['payload']?['personal_interest'];
+    final interests = data['personal_interests'] ?? data['payload']?['personal_interests'];
     if (interests is List) {
       _selectedInterests = List<String>.from(interests.map((e) => e.toString()));
     }
     _tripName = data['template_name'] ?? data['name'] ?? _tripName;
-
     notifyListeners();
   }
 
-  // --- FEATURE 2: SAVE TEMPLATE ---
   Future<void> saveHistoryInput(String name) async {
     if (_searchLocation.isEmpty || _accommodation == null || _paxGroup == null || _difficultyLevel == null) {
       throw Exception("Vui lòng điền đầy đủ thông tin trước khi lưu.");
     }
-    // Build a payload compatible with our history_inputs storage.
     final payload = {
       'location': _searchLocation,
       'rest_type': _accommodation,
@@ -151,116 +131,38 @@ class TripProvider with ChangeNotifier {
       'difficulty': _difficultyLevel,
       'personal_interests': _selectedInterests,
     };
-
-    try {
-      await _supabaseDb.saveHistoryInput(name, payload);
-    } catch (e) {
-      // If Supabase save fails, bubble up for UI to show error
-      rethrow;
-    }
+    await _supabaseDb.saveHistoryInput(name, payload);
   }
 
-  // --- FEATURE 3: FETCH SUGGESTED ROUTES (LOGIC ĐÃ SỬA) ---
+  // --- FEATURE QUAN TRỌNG NHẤT: FETCH ROUTES ---
+  // Đã chuyển sang gọi Supabase trực tiếp
   Future<List<dynamic>> fetchSuggestedRoutes() async {
-    // 1. Chuẩn bị tham số
-    final Map<String, dynamic> queryParams = {};
-    if (_searchLocation.isNotEmpty) queryParams['location'] = _searchLocation;
-    if (_difficultyLevel != null) queryParams['difficulty'] = _difficultyLevel;
-
-    // 2. Gọi API SERVER (Ưu tiên)
     try {
-      final uri = Uri.parse('$_baseUrl/routes/suggested/')
-          .replace(queryParameters: queryParams);
+      debugPrint("🔌 Đang gọi Supabase lấy danh sách cung đường...");
 
-      debugPrint("🔌 Đang gọi API: $uri");
-      final response = await http.get(uri).timeout(const Duration(seconds: 3));
+      // Gọi hàm Service vừa viết
+      final data = await _supabaseDb.getSuggestedRoutes(
+        location: _searchLocation,
+        difficulty: _difficultyLevel,
+        accommodation: _accommodation,
+        durationDays: durationDays,
+      );
 
-      if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
-        debugPrint("✅ API trả về ${data.length} kết quả.");
-        return data;
-      } else {
-        // Nếu Server lỗi (500, 404...), in lỗi và để code chạy tiếp xuống phần Mock Data
-        debugPrint("⚠️ Server trả về lỗi: ${response.statusCode}");
-      }
+      debugPrint("✅ Supabase trả về ${data.length} kết quả.");
+
+      // Client-side filtering phụ trợ (nếu cần)
+      // Ví dụ: Lọc thêm theo tags nếu Supabase search chưa đủ sâu
+      // Nhưng ở đây ta cứ trả về data thô, UI sẽ lo phần hiển thị
+      return data;
+
     } catch (e) {
-      // Nếu mất mạng hoặc timeout, in lỗi và để code chạy tiếp xuống phần Mock Data
-      debugPrint("⚠️ Lỗi kết nối API ($e). Đang chuyển sang Offline Mode...");
+      debugPrint("❌ Lỗi Fetch Route: $e");
+      // Trả về rỗng để UI hiện thông báo Empty State thay vì crash
+      return [];
     }
-
-    // 3. FALLBACK: MOCK DATA (Chỉ chạy khi có Exception hoặc Server lỗi != 200)
-    debugPrint("ℹ️ Đang sử dụng dữ liệu giả lập (Offline Mode)");
-    await Future.delayed(const Duration(milliseconds: 500));
-
-    final List<Map<String, dynamic>> backupRoutes = [
-      {
-        "id": 1,
-        "name": "Chư Đăng Ya",
-        "location": "Gia Lai",
-        "description": "Miệng núi lửa cổ, thiên đường hoa dã quỳ.",
-        "imageUrl": "https://images.unsplash.com/photo-1501785888041-af3ef285b470?q=80",
-        "gallery": ["https://images.unsplash.com/photo-1501785888041-af3ef285b470?q=80"],
-        "totalDistanceKm": 5.0,
-        "elevationGainM": 400,
-        "durationDays": 1,
-        "tags": ["volcano", "flowers", "gia-lai"]
-      },
-      {
-        "id": 2,
-        "name": "Núi Chứa Chan",
-        "location": "Đồng Nai",
-        "description": "Cung đường trekking quốc dân gần Sài Gòn.",
-        "imageUrl": "https://images.unsplash.com/photo-1470770841072-f978cf4d019e?q=80",
-        "gallery": [],
-        "totalDistanceKm": 10.5,
-        "elevationGainM": 800,
-        "durationDays": 2,
-        "tags": ["mountain", "camping", "dong-nai"]
-      },
-      {
-        "id": 3,
-        "name": "Tà Năng - Phan Dũng",
-        "location": "Lâm Đồng",
-        "description": "Cung đường trekking đẹp nhất Việt Nam.",
-        "imageUrl": "https://images.unsplash.com/photo-1533240332313-0dbdd3199061?q=80",
-        "gallery": [],
-        "totalDistanceKm": 55.0,
-        "elevationGainM": 1100,
-        "durationDays": 3,
-        "tags": ["grassland", "lam-dong"]
-      }
-    ];
-
-    // LOGIC LỌC OFFLINE
-    if (_searchLocation.isNotEmpty) {
-      final query = _removeDiacritics(_searchLocation).toLowerCase();
-
-      final filtered = backupRoutes.where((r) {
-        final loc = _removeDiacritics(r['location'].toString()).toLowerCase();
-        final name = _removeDiacritics(r['name'].toString()).toLowerCase();
-        return loc.contains(query) || name.contains(query);
-      }).toList();
-
-      // FIX 2: Nếu lọc Offline ra rỗng, trả về rỗng luôn.
-      // Điều này giúp UI hiển thị thông báo "Không tìm thấy chuyến đi nào ở [Địa điểm]"
-      // Thay vì tự động hiện lại toàn bộ danh sách gây khó hiểu.
-      return filtered;
-    }
-
-    return backupRoutes;
   }
 
-  String _removeDiacritics(String str) {
-    const withDia = 'áàảãạăắằẳẵặâấầẩẫậđéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵ';
-    const withoutDia = 'aaaaaaaaaaaaaaaaadeeeeeeeeeeeiiiiiooooooooooooooooouuuuuuuuuuuyyyyy';
-    var result = str;
-    for (int i = 0; i < withDia.length; i++) {
-      result = result.replaceAll(withDia[i], withoutDia[i]);
-    }
-    return result;
-  }
-
-  // --- FEATURE 4: RESET ---
+  // Hàm reset
   void resetTrip() {
     _searchLocation = '';
     _accommodation = null;
