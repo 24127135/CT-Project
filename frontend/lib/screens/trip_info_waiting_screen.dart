@@ -23,7 +23,7 @@ class _WaitingScreenState extends State<WaitingScreen> {
 
   Future<void> _fetchData() async {
     try {
-      await GeminiService().checkAvailableModels();
+      //await GeminiService().checkAvailableModels();
       if (!mounted) return;
 
       // 1. Gọi Provider (Hàm này giờ đã trả về List<RouteModel> rồi, không cần parse nữa)
