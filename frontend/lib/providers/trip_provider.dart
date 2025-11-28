@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import '../models/trip_template.dart';
 import '../services/supabase_db_service.dart';
+import '../services/gemini_service.dart';
+import '../features/preference_matching/models/route_model.dart';
 
 class TripProvider with ChangeNotifier {
 
   // Khởi tạo Service Supabase
   final SupabaseDbService _supabaseDb = SupabaseDbService();
+  final GeminiService _geminiService = GeminiService();
 
   TripProvider([String? unused]);
 
@@ -136,28 +139,43 @@ class TripProvider with ChangeNotifier {
 
   // --- FEATURE QUAN TRỌNG NHẤT: FETCH ROUTES ---
   // Đã chuyển sang gọi Supabase trực tiếp
-  Future<List<dynamic>> fetchSuggestedRoutes() async {
+  Future<List<RouteModel>> fetchSuggestedRoutes() async {
     try {
-      debugPrint("🔌 Đang gọi Supabase lấy danh sách cung đường...");
+      debugPrint("1️⃣ Bắt đầu quy trình gợi ý thông minh...");
 
-      // Gọi hàm Service vừa viết
-      final data = await _supabaseDb.getSuggestedRoutes(
-        location: _searchLocation,
-        difficulty: _difficultyLevel,
+      // Bước A: Lấy dữ liệu thô từ Supabase (Lọc sơ bộ)
+      final rawData = await _supabaseDb.getSuggestedRoutes(
+        location: _searchLocation, // Lọc theo địa điểm user nhập
+        difficulty: null,          // Mẹo: Lấy tất cả độ khó để AI có nhiều lựa chọn hơn
         accommodation: _accommodation,
         durationDays: durationDays,
       );
 
-      debugPrint("✅ Supabase trả về ${data.length} kết quả.");
+      // Convert sang List RouteModel
+      List<RouteModel> initialRoutes = rawData.map((item) => RouteModel.fromJson(item)).toList();
 
-      // Client-side filtering phụ trợ (nếu cần)
-      // Ví dụ: Lọc thêm theo tags nếu Supabase search chưa đủ sâu
-      // Nhưng ở đây ta cứ trả về data thô, UI sẽ lo phần hiển thị
-      return data;
+      // Nếu Supabase không tìm thấy gì, trả về rỗng luôn
+      if (initialRoutes.isEmpty) {
+        debugPrint("⚠️ Supabase không tìm thấy cung đường nào khớp bộ lọc cơ bản.");
+        return [];
+      }
+
+      // Bước B: Gửi cho AI phân tích (Tinh chỉnh & Viết lời khuyên)
+      debugPrint("2️⃣ Gửi ${initialRoutes.length} cung đường cho Gemini...");
+
+      final aiRoutes = await _geminiService.recommendRoutes(
+        allRoutes: initialRoutes,
+        userLocation: _searchLocation,
+        userInterests: _selectedInterests.join(", "), // VD: "Săn mây, Cắm trại"
+        userExperience: _difficultyLevel ?? "Người mới",
+        duration: "$durationDays ngày",
+        groupSize: _paxGroup ?? "Nhóm nhỏ",
+      );
+
+      return aiRoutes;
 
     } catch (e) {
-      debugPrint("❌ Lỗi Fetch Route: $e");
-      // Trả về rỗng để UI hiện thông báo Empty State thay vì crash
+      debugPrint("❌ Lỗi Provider: $e");
       return [];
     }
   }

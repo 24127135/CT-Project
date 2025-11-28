@@ -27,6 +27,36 @@ class RouteModel {
     required this.aiNote,
   });
 
+  RouteModel copyWith({
+    int? id,
+    String? name,
+    String? location,
+    String? description,
+    String? imageUrl,
+    List<String>? gallery,
+    double? distanceKm,
+    int? durationDays,
+    int? durationNights,
+    int? elevationGainM,
+    String? terrain,
+    String? aiNote,
+  }) {
+    return RouteModel(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      location: location ?? this.location,
+      description: description ?? this.description,
+      imageUrl: imageUrl ?? this.imageUrl,
+      gallery: gallery ?? this.gallery,
+      distanceKm: distanceKm ?? this.distanceKm,
+      durationDays: durationDays ?? this.durationDays,
+      durationNights: durationNights ?? this.durationNights,
+      elevationGainM: elevationGainM ?? this.elevationGainM,
+      terrain: terrain ?? this.terrain,
+      aiNote: aiNote ?? this.aiNote,
+    );
+  }
+
   factory RouteModel.fromJson(Map<String, dynamic> json) {
     // 1. Xử lý Tags
     List<String> tags = [];
