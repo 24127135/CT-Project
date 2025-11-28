@@ -73,7 +73,14 @@ class SupabaseDbService {
       return [];
     }
   }
+  /// Delete a plan by id (only if it belongs to current user)
+  Future<void> deletePlan(int id) async {
+    final uid = _uid;
+    if (uid == null) throw Exception('Not signed in');
 
+    // Xóa trong bảng 'plans' với id tương ứng và phải thuộc về user hiện tại
+    await _client.from('plans').delete().eq('id', id).eq('user_id', uid);
+  }
   // --- 2. USER PROFILES ---
 
   Future<Map<String, dynamic>?> getProfile() async {
