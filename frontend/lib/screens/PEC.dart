@@ -5,6 +5,8 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:frontend/providers/trip_provider.dart'; // Ensure this path is correct
 
+import 'package:url_launcher/url_launcher.dart';
+
 class PECScreen extends StatelessWidget {
   final int? planId;
 
@@ -38,9 +40,11 @@ class _EquipmentItem {
   final double price;
   final String imageUrl;
   final int weightGrams;
+  final String? buyLink; // NEW FIELD
   bool selected;
   int quantity;
   String? aiReason;
+  
 
   _EquipmentItem({
     required this.id,
@@ -49,6 +53,7 @@ class _EquipmentItem {
     required this.price,
     required this.imageUrl,
     required this.weightGrams,
+    this.buyLink,
     this.selected = false,
     this.quantity = 1,
     this.aiReason,
@@ -62,6 +67,7 @@ class _EquipmentItem {
       price: (map['price'] as num?)?.toDouble() ?? 0.0,
       imageUrl: map['image_url'] as String? ?? '',
       weightGrams: map['weight_grams'] as int? ?? 0,
+      buyLink: map['buy_link'] as String?, // Map from DB
     );
   }
 }
@@ -94,6 +100,34 @@ class _PECContentState extends State<PECContent> {
   void initState() {
     super.initState();
     _initialLoadFuture = _loadData();
+  }
+
+  // Click an equipment to direct to shop website
+  Future<void> _launchBuyLink(String itemName, String? dbLink) async {
+    final Uri url;
+
+    if (dbLink != null && dbLink.isNotEmpty) {
+      // 1. Priority: Use the specific link from Database
+      url = Uri.parse(dbLink);
+    } else {
+      // 2. Fallback: Generate a Shopee Vietnam Search URL
+      // You can swap this for 'lazada.vn/catalog/?q=' or Google Shopping
+      final query = Uri.encodeComponent(itemName);
+      url = Uri.parse('https://shopee.vn/search?keyword=$query');
+    }
+
+    try {
+      if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+        throw 'Could not launch $url';
+      }
+    } catch (e) {
+      debugPrint("Error launching URL: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Không thể mở liên kết mua hàng")),
+        );
+      }
+    }
   }
 
   // --- CORE LOGIC: Fetch Catalog + Plan Data & Merge ---
@@ -475,8 +509,13 @@ class _PECContentState extends State<PECContent> {
           ),
           child: Column(
             children: [
+              // ---------------------------------------------------------
+              // 👇 REPLACE THE OLD ROW WITH THIS NEW ROW 👇
+              // ---------------------------------------------------------
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start, // Align top for better layout
                 children: [
+                  // 1. Checkbox
                   Transform.scale(
                     scale: 1.2,
                     child: Checkbox(
@@ -489,6 +528,7 @@ class _PECContentState extends State<PECContent> {
                     ),
                   ),
                   
+                  // 2. Image
                   Container(
                     width: 70,
                     height: 70,
@@ -502,6 +542,7 @@ class _PECContentState extends State<PECContent> {
                         : const Center(child: Icon(Icons.image, color: Colors.grey)),
                   ),
 
+                  // 3. Text Info (Expanded)
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -518,22 +559,62 @@ class _PECContentState extends State<PECContent> {
                     ),
                   ),
 
+                  // 4. Quantity & Buy Button Column (NEW PART)
                   Column(
                     mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.end, // Align to right side
                     children: [
-                      InkWell(
-                        onTap: () => setState(() => item.quantity++),
-                        child: const Padding(padding: EdgeInsets.all(4), child: Icon(Icons.add, size: 20)),
+                      // Quantity Row
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          InkWell(
+                            onTap: () => setState(() { if(item.quantity > 1) item.quantity--; }),
+                            child: const Padding(padding: EdgeInsets.all(4), child: Icon(Icons.remove, size: 20)),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            child: Text('${item.quantity}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                          ),
+                          InkWell(
+                            onTap: () => setState(() => item.quantity++),
+                            child: const Padding(padding: EdgeInsets.all(4), child: Icon(Icons.add, size: 20)),
+                          ),
+                        ],
                       ),
-                      Text('${item.quantity}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      
+                      const SizedBox(height: 12), // Spacing between Qty and Button
+
+                      // 🟢 "Buy Now" Button
                       InkWell(
-                        onTap: () => setState(() { if(item.quantity > 1) item.quantity--; }),
-                        child: const Padding(padding: EdgeInsets.all(4), child: Icon(Icons.remove, size: 20)),
+                        onTap: () => _launchBuyLink(item.name, item.buyLink),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.orange.withOpacity(0.5)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.shopping_cart_outlined, size: 14, color: Colors.deepOrange),
+                              const SizedBox(width: 4),
+                              Text(
+                                "Mua ngay", 
+                                style: TextStyle(fontSize: 11, color: Colors.deepOrange, fontWeight: FontWeight.bold)
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ],
                   )
                 ],
               ),
+              // ---------------------------------------------------------
+              // 👆 END OF NEW ROW 👆
+              // ---------------------------------------------------------
               
               if (item.aiReason != null)
                 Container(

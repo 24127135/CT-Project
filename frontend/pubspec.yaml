@@ -9,6 +9,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  url_launcher: ^6.2.5
+
 
   dio: ^5.4.3
   flutter_secure_storage: ^9.0.0
@@ -41,3 +43,4 @@ flutter:
 flutter_icons:
   android: true
   image_path: "assets/icon/app_icon.png"
+
