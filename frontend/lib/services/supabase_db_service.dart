@@ -1,100 +1,179 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-/// Lightweight Supabase DB service for basic CRUD against `profiles`, `plans`, and related tables.
-/// Use this from UI code or providers to read/write data using the client's authenticated session.
 class SupabaseDbService {
   final _client = Supabase.instance.client;
 
-  /// Returns the current user's id or null if not signed in.
   String? get _uid => _client.auth.currentUser?.id;
 
-  /// Fetch the current user's profile (or null if not found).
+  // --- 1. ROUTES (CUNG ĐƯỜNG) ---
+
+  /// Lấy danh sách cung đường gợi ý từ bảng 'routes'
+  Future<List<Map<String, dynamic>>> getSuggestedRoutes({
+    String? location,
+    String? difficulty,
+    String? accommodation,
+    int? durationDays,
+  }) async {
+    try {
+      // 1. Lấy dữ liệu thô từ DB
+      var query = _client.from('routes').select();
+
+      if (difficulty != null && difficulty.isNotEmpty) {
+        query = query.eq('difficulty_level', difficulty);
+      }
+
+      final res = await query.order('id', ascending: true);
+      List<Map<String, dynamic>> routes = List<Map<String, dynamic>>.from(res as List<dynamic>);
+
+      // 2. Lọc Logic phía Client
+      final keyword = (location ?? '').toLowerCase().trim();
+      final accomFilter = (accommodation ?? '').toLowerCase().trim();
+
+      routes = routes.where((route) {
+        // A. Lọc Location
+        if (keyword.isNotEmpty) {
+          final name = (route['name'] ?? '').toString().toLowerCase();
+          final desc = (route['description'] ?? '').toString().toLowerCase();
+          final tagsList = route['tags'] as List<dynamic>? ?? [];
+          final tagsString = tagsList.join(' ').toLowerCase();
+
+          bool matchLoc = name.contains(keyword) || desc.contains(keyword) || tagsString.contains(keyword);
+          if (!matchLoc) return false;
+        }
+
+        // B. Lọc Accommodation
+        if (accomFilter.isNotEmpty && !accomFilter.contains('kết hợp')) {
+          final tagsList = route['tags'] as List<dynamic>? ?? [];
+          final tagsString = tagsList.join(' ').toLowerCase();
+          if (!tagsString.contains(accomFilter)) return false;
+        }
+
+        // C. Lọc Duration
+        if (durationDays != null) {
+          final routeDays = (route['estimated_duration_days'] ?? 0) as int;
+          if ((routeDays - durationDays).abs() > 1) return false;
+        }
+
+        return true;
+      }).toList();
+
+      return routes;
+
+    } catch (e) {
+      print("❌ Lỗi Logic: $e");
+      return [];
+    }
+  }
+
+  // --- 2. USER PROFILES ---
+
   Future<Map<String, dynamic>?> getProfile() async {
     final uid = _uid;
     if (uid == null) return null;
-
     final resp = await _client.from('profiles').select().eq('user_id', uid).maybeSingle();
     if (resp == null) return null;
     return Map<String, dynamic>.from(resp);
   }
 
-  /// Upsert the profile for the current user. `data` can include `full_name`, `email`, `metadata`, etc.
   Future<void> upsertProfile(Map<String, dynamic> data) async {
     final uid = _uid;
     if (uid == null) throw Exception('Not signed in');
-
-    // Ensure we set user_id so RLS checks allow the insert/update
     final payload = Map<String, dynamic>.from(data);
     payload['user_id'] = uid;
-
-    final res = await _client.from('profiles').upsert(payload).select().maybeSingle();
-    if (res == null) throw Exception('Upsert profile returned null');
+    await _client.from('profiles').upsert(payload);
   }
 
-  /// Fetch plans for the current user.
+  // --- 3. PLANS ---
+
   Future<List<dynamic>> getPlans() async {
     final uid = _uid;
     if (uid == null) return [];
-
-    final res = await _client.from('plans').select().eq('user_id', uid);
-    return res as List<dynamic>;
+    return await _client.from('plans').select().eq('user_id', uid);
   }
 
-  /// Create a plan for the current user. `body` should contain route_id, name, start_date, end_date, data, etc.
-  Future<Map<String, dynamic>> createPlan(Map<String, dynamic> body) async {
+  /// Delete a plan by id
+  Future<void> deletePlan(int id) async {
+    final uid = _uid;
+    if (uid == null) throw Exception('Not signed in');
+    await _client.from('plans').delete().eq('id', id).eq('user_id', uid);
+  }
+
+  // ✅ ĐÃ SỬA: Chỉ giữ lại 1 hàm createPlan chính xác nhất
+  // Trong class SupabaseDbService
+
+  // Trong SupabaseDbService
+
+  Future<Map<String, dynamic>> createPlan({
+    required String name,
+    int? routeId, // 👈 SỬA: Đổi từ "required int routeId" thành "int? routeId" (cho phép null)
+    required String location,
+    required String restType,
+    required int groupSize,
+    required String startDate,
+    required int durationDays,
+    required String difficulty,
+    required List<String> personalInterests,
+  }) async {
     final uid = _uid;
     if (uid == null) throw Exception('Not signed in');
 
-    final payload = Map<String, dynamic>.from(body);
-    payload['user_id'] = uid;
+    final payload = {
+      'user_id': uid,
+      'name': name,
+      'route_id': routeId, // Nếu null, Supabase sẽ lưu là NULL
+      'location': location,
+      'rest_type': restType,
+      'group_size': groupSize,
+      'start_date': startDate,
+      'duration_days': durationDays,
+      'difficulty': difficulty,
+      'personal_interests': personalInterests,
+    };
 
     final res = await _client.from('plans').insert(payload).select().single();
     return Map<String, dynamic>.from(res);
   }
 
-  /// Fetch history input templates for current user.
+  // --- 4. HISTORY INPUTS ---
+
   Future<List<Map<String, dynamic>>> getHistoryInputs() async {
     final uid = _uid;
     if (uid == null) return [];
-
     final res = await _client.from('history_inputs').select().eq('user_id', uid).order('id', ascending: false);
     return List<Map<String, dynamic>>.from(res as List<dynamic>);
   }
 
-  /// Delete a history input by id (only if it belongs to current user)
   Future<void> deleteHistoryInput(int id) async {
     final uid = _uid;
     if (uid == null) throw Exception('Not signed in');
-
     await _client.from('history_inputs').delete().eq('id', id).eq('user_id', uid);
   }
 
-  /// Save a history input (template)
   Future<Map<String, dynamic>> saveHistoryInput(String name, Map<String, dynamic> payload) async {
     final uid = _uid;
     if (uid == null) throw Exception('Not signed in');
 
-    // Normalize payload: accept either a flattened payload (fields) or a nested payload map.
     final Map<String, dynamic> data = {};
-
-    // Use explicit fields when present, falling back to nested keys in `payload`.
     data['user_id'] = uid;
     data['template_name'] = name;
+
     data['location'] = payload['location'] ?? payload['payload']?['location'];
-    data['rest_type'] = payload['rest_type'] ?? payload['payload']?['rest_type'] ?? payload['accommodation'] ?? payload['payload']?['accommodation'];
-    data['group_size'] = payload['group_size'] ?? payload['payload']?['group_size'] ?? payload['pax_group'] ?? payload['payload']?['pax_group'];
+    data['rest_type'] = payload['rest_type'] ?? payload['payload']?['rest_type'] ?? payload['accommodation'];
+    data['group_size'] = payload['group_size'] ?? payload['payload']?['group_size'] ?? payload['pax_group'];
     data['start_date'] = payload['start_date'] ?? payload['payload']?['start_date'];
     data['duration_days'] = payload['duration_days'] ?? payload['payload']?['duration_days'];
-    data['difficulty'] = payload['difficulty'] ?? payload['payload']?['difficulty'] ?? payload['difficulty_level'] ?? payload['payload']?['difficulty_level'];
-    data['personal_interests'] = payload['personal_interest'] ?? payload['personal_interests'] ?? payload['payload']?['personal_interest'] ?? payload['payload']?['personal_interests'] ?? payload['interests'] ?? payload['payload']?['interests'];
+    data['difficulty'] = payload['difficulty'] ?? payload['payload']?['difficulty'] ?? payload['difficulty_level'];
 
-    // Remove null keys so Supabase doesn't try to insert them as nulls unnecessarily.
+    var interests = payload['personal_interest'] ?? payload['personal_interests'] ?? payload['interests'];
+    if (interests is List) {
+      data['personal_interests'] = interests;
+    } else {
+      data['personal_interests'] = [];
+    }
+
     final insertPayload = <String, dynamic>{};
-    data.forEach((k, v) {
-      if (v != null) insertPayload[k] = v;
-    });
+    data.forEach((k, v) { if (v != null) insertPayload[k] = v; });
 
-    // Straightforward insert: expect table schema to match the keys we send.
     final res = await _client.from('history_inputs').insert(insertPayload).select().single();
     return Map<String, dynamic>.from(res);
   }

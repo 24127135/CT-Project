@@ -19,7 +19,8 @@ dependencies:
   provider: ^6.0.0
   supabase_flutter: ^2.10.3
   calendar_date_picker2: ^1.1.4
-
+  google_generative_ai: ^0.4.6
+  
 dev_dependencies:
   flutter_test:
     sdk: flutter

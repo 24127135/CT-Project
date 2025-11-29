@@ -175,13 +175,59 @@ class _TripConfirmScreenState extends State<TripConfirmScreen> {
             // 3. Nút "Xác nhận" (Màu xanh) - CHỈ CHUYỂN TRANG
             Expanded(
               child: ElevatedButton(
-                onPressed: () {
-                  Navigator.push(context, MaterialPageRoute(builder: (context) => const WaitingScreen()));
+                onPressed: () async {
+                  // 1. Hiện vòng tròn Loading để người dùng chờ
+                  showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (ctx) => const Center(
+                      child: CircularProgressIndicator(color: Colors.white),
+                    ),
+                  );
+
+                  try {
+                    // 2. Gọi hàm lưu dữ liệu vào Supabase (Hàm mới viết ở Provider)
+                    // Dùng context.read để gọi hàm 1 lần
+                    await context.read<TripProvider>().saveTripRequest();
+
+                    if (!context.mounted) return;
+
+                    // 3. Tắt Loading
+                    Navigator.of(context).pop();
+
+                    // 4. Chuyển sang màn hình chờ (WaitingScreen)
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const WaitingScreen()),
+                    );
+
+                  } catch (e) {
+                    if (!context.mounted) return;
+
+                    // Tắt Loading nếu gặp lỗi
+                    Navigator.of(context).pop();
+
+                    // Hiện thông báo lỗi cho người dùng biết
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Lỗi lưu thông tin: $e'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
                 },
-                style: ElevatedButton.styleFrom(backgroundColor: primaryGreen, padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)), elevation: 2),
-                child: const Text('Xác nhận', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryGreen, // Đảm bảo biến primaryGreen đã được import/khai báo
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  elevation: 2,
+                ),
+                child: const Text(
+                  'Xác nhận',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                ),
               ),
-            ),
+            )
           ],
         ),
       ),

@@ -17,7 +17,7 @@ urlpatterns = [
 
     # URL tùy chỉnh cho việc gợi ý Route
     # /api/routes/suggested/ (GET)
-    path('routes/suggested/',
-         views.RouteSuggestionView.as_view(),
-         name='route-suggestion'),
+    # path('routes/suggested/',
+    #      views.RouteSuggestionView.as_view(),
+    #      name='route-suggestion'),
 ]
