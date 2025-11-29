@@ -7,3 +7,4 @@ PyJWT
 requests
 django-cors-headers
 djangorestframework-camel-case
+google-generativeai

@@ -3,10 +3,15 @@ import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ApiService {
-  // Base URL of your Django backend
-  static const String _baseUrl = 'http://192.168.0.12:8000';
+  // FIXED: Use 10.0.2.2 for Android Emulator to reach Host PC's localhost
+  static const String _baseUrl = 'http://10.0.2.2:8000';
 
-  final Dio _dio = Dio(BaseOptions(baseUrl: _baseUrl));
+  final Dio _dio = Dio(BaseOptions(
+    baseUrl: _baseUrl,
+    connectTimeout: const Duration(seconds: 5), // Added timeout
+    receiveTimeout: const Duration(seconds: 5), // Added timeout
+  ));
+
 
   ApiService() {
     // Attach interceptor to add Authorization header from Supabase session

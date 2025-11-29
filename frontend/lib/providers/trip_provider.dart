@@ -1,20 +1,14 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-// debugPrint is available from material.dart
 import '../models/trip_template.dart';
 import '../services/supabase_db_service.dart';
+import '../services/gemini_service.dart';
+import '../features/preference_matching/models/route_model.dart';
 
 class TripProvider with ChangeNotifier {
-  // --- CẤU HÌNH API ---
-  // FIXED: Gán cứng IP để tránh lỗi "No host specified". 
-  // Dùng '10.0.2.2' cho Android Emulator. Nếu chạy máy thật hãy thay bằng IP LAN (VD: 192.168.1.x)
-  static const String _serverIp = '10.0.2.2'; 
-  
-  static const String _baseUrl = 'http://$_serverIp:8000/api';
-  
-  
+
+  // Khởi tạo Service Supabase
   final SupabaseDbService _supabaseDb = SupabaseDbService();
+  final GeminiService _geminiService = GeminiService();
 
   TripProvider([String? unused]);
 
@@ -27,7 +21,10 @@ class TripProvider with ChangeNotifier {
   String? _difficultyLevel;
   String _note = '';
   List<String> _selectedInterests = [];
-  String _tripName = ''; 
+  String _tripName = '';
+
+  int? _currentPlanId; 
+  int? get currentPlanId => _currentPlanId;
 
   // --- Getters ---
   String get searchLocation => _searchLocation;
@@ -44,8 +41,7 @@ class TripProvider with ChangeNotifier {
     if (_startDate == null || _endDate == null) return 1;
     return _endDate!.difference(_startDate!).inDays + 1;
   }
-  
-  // Helper chuyển đổi nhóm người
+
   int get parsedGroupSize {
     if (_paxGroup == 'Đơn lẻ (1-2 người)') return 2;
     if (_paxGroup == 'Nhóm nhỏ (3-6 người)') return 5;
@@ -76,7 +72,7 @@ class TripProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  // --- FEATURE 1: APPLY TEMPLATE ---
+  // --- Logic Apply Template & History (Giữ nguyên) ---
   void applyTemplate(TripTemplate template) {
     _searchLocation = template.location;
     _accommodation = template.accommodation;
@@ -94,20 +90,15 @@ class TripProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  /// Apply a saved history input (from Supabase) to the provider state.
   void applyHistoryInput(Map<String, dynamic> data) {
     _searchLocation = data['location'] ?? data['payload']?['location'] ?? '';
     _accommodation = data['rest_type'] ?? data['payload']?['rest_type'];
 
     final gs = data['group_size'] ?? data['payload']?['group_size'];
     if (gs is int) {
-      if (gs >= 7) {
-        _paxGroup = 'Nhóm đông (7+ người)';
-      } else if (gs >= 3) {
-        _paxGroup = 'Nhóm nhỏ (3-6 người)';
-      } else {
-        _paxGroup = 'Đơn lẻ (1-2 người)';
-      }
+      if (gs >= 7) _paxGroup = 'Nhóm đông (7+ người)';
+      else if (gs >= 3) _paxGroup = 'Nhóm nhỏ (3-6 người)';
+      else _paxGroup = 'Đơn lẻ (1-2 người)';
     } else if (gs is String) {
       _paxGroup = gs;
     }
@@ -121,146 +112,170 @@ class TripProvider with ChangeNotifier {
         final d = (dd is int) ? dd : int.tryParse(dd?.toString() ?? '') ?? 1;
         _endDate = _startDate!.add(Duration(days: d - 1));
       } catch (_) {
-        _startDate = null;
-        _endDate = null;
+        _startDate = null; _endDate = null;
       }
     }
-
     _difficultyLevel = data['difficulty'] ?? data['payload']?['difficulty'];
-    final interests = data['personal_interests'] ?? data['payload']?['personal_interests'] ?? data['personal_interest'] ?? data['payload']?['personal_interest'];
+    final interests = data['personal_interests'] ?? data['payload']?['personal_interests'];
     if (interests is List) {
       _selectedInterests = List<String>.from(interests.map((e) => e.toString()));
     }
     _tripName = data['template_name'] ?? data['name'] ?? _tripName;
-
     notifyListeners();
   }
 
-  // --- FEATURE 2: SAVE TEMPLATE ---
-  Future<void> saveHistoryInput(String name) async {
-    if (_searchLocation.isEmpty || _accommodation == null || _paxGroup == null || _difficultyLevel == null) {
-      throw Exception("Vui lòng điền đầy đủ thông tin trước khi lưu.");
-    }
-    // Build a payload compatible with our history_inputs storage.
-    final payload = {
-      'location': _searchLocation,
-      'rest_type': _accommodation,
-      'group_size': parsedGroupSize,
-      'start_date': _startDate != null ? DateTime(_startDate!.year, _startDate!.month, _startDate!.day).toIso8601String().split('T').first : null,
-      'duration_days': durationDays,
-      'difficulty': _difficultyLevel,
-      'personal_interests': _selectedInterests,
-    };
-
+  // --- SAVE DRAFT PLAN (Step 1-4) ---
+  Future<void> saveTripRequest() async {
     try {
-      await _supabaseDb.saveHistoryInput(name, payload);
+      if (_tripName.isEmpty) throw Exception("Vui lòng đặt tên cho chuyến đi");
+      if (_startDate == null) throw Exception("Vui lòng chọn ngày khởi hành");
+
+      // Call Service to create INITIAL plan
+      final response = await _supabaseDb.createPlan(
+        name: _tripName,
+        routeId: null, // Route is null initially
+        location: _searchLocation,
+        restType: _accommodation ?? 'Không xác định',
+        groupSize: parsedGroupSize,
+        startDate: _startDate!.toIso8601String().split('T').first,
+        durationDays: durationDays,
+        difficulty: _difficultyLevel ?? 'Vừa phải',
+        personalInterests: _selectedInterests,
+      );
+
+      // 🟢 STORE THE ID for later use
+      if (response['id'] != null) {
+        _currentPlanId = response['id'];
+        debugPrint("✅ Draft Plan Saved. ID: $_currentPlanId");
+      }
+
     } catch (e) {
-      // If Supabase save fails, bubble up for UI to show error
+      debugPrint("❌ Error saving trip request: $e");
       rethrow;
     }
   }
 
-  // --- FEATURE 3: FETCH SUGGESTED ROUTES (LOGIC ĐÃ SỬA) ---
-  Future<List<dynamic>> fetchSuggestedRoutes() async {
-    // 1. Chuẩn bị tham số
-    final Map<String, dynamic> queryParams = {};
-    if (_searchLocation.isNotEmpty) queryParams['location'] = _searchLocation;
-    if (_difficultyLevel != null) queryParams['difficulty'] = _difficultyLevel;
-
-    // 2. Gọi API SERVER (Ưu tiên)
+  // --- CONFIRM ROUTE & AI CHECKLIST (Step 6) ---
+  // Updated to accept the AI generated checklist
+  Future<void> confirmRouteForPlan(int routeId, {Map<String, dynamic>? checklist}) async {
     try {
-      final uri = Uri.parse('$_baseUrl/routes/suggested/')
-          .replace(queryParameters: queryParams);
-
-      debugPrint("🔌 Đang gọi API: $uri");
-      final response = await http.get(uri).timeout(const Duration(seconds: 3));
-
-      if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
-        debugPrint("✅ API trả về ${data.length} kết quả.");
-        return data;
-      } else {
-        // Nếu Server lỗi (500, 404...), in lỗi và để code chạy tiếp xuống phần Mock Data
-        debugPrint("⚠️ Server trả về lỗi: ${response.statusCode}");
+      if (_currentPlanId == null) {
+        throw Exception("Lỗi: Không tìm thấy ID chuyến đi. Vui lòng tạo lại.");
       }
+
+      debugPrint("🔄 Updating Plan $_currentPlanId with Route $routeId and Checklist...");
+
+      // Call Update Method on Supabase Service
+      // Ensure your SupabaseDbService.updatePlanRoute is updated to accept the checklist parameter!
+      await _supabaseDb.updatePlanRoute(
+        _currentPlanId!, 
+        routeId,
+        checklist: checklist // Pass the AI checklist here
+      );
+
+      debugPrint("✅ Plan updated with Route ID & Equipment. Ready for PEC.");
+      
     } catch (e) {
-      // Nếu mất mạng hoặc timeout, in lỗi và để code chạy tiếp xuống phần Mock Data
-      debugPrint("⚠️ Lỗi kết nối API ($e). Đang chuyển sang Offline Mode...");
+      debugPrint("❌ Error confirming route: $e");
+      rethrow;
     }
+  }
 
-    // 3. FALLBACK: MOCK DATA (Chỉ chạy khi có Exception hoặc Server lỗi != 200)
-    debugPrint("ℹ️ Đang sử dụng dữ liệu giả lập (Offline Mode)");
-    await Future.delayed(const Duration(milliseconds: 500));
+  Future<void> saveHistoryInput(String name) async {
+    if (_searchLocation.isEmpty || _accommodation == null || _paxGroup == null || _difficultyLevel == null) {
+      throw Exception("Vui lòng điền đầy đủ thông tin trước khi lưu.");
+    }
+    final payload = {
+      'location': _searchLocation,
+      'rest_type': _accommodation,
+      'group_size': parsedGroupSize,
+      'start_date': _startDate?.toIso8601String().split('T').first,
+      'duration_days': durationDays,
+      'difficulty': _difficultyLevel,
+      'personal_interests': _selectedInterests,
+    };
+    await _supabaseDb.saveHistoryInput(name, payload);
+  }
 
-    final List<Map<String, dynamic>> backupRoutes = [
-      {
-        "id": 1,
-        "name": "Chư Đăng Ya",
-        "location": "Gia Lai",
-        "description": "Miệng núi lửa cổ, thiên đường hoa dã quỳ.",
-        "imageUrl": "https://images.unsplash.com/photo-1501785888041-af3ef285b470?q=80",
-        "gallery": ["https://images.unsplash.com/photo-1501785888041-af3ef285b470?q=80"],
-        "totalDistanceKm": 5.0,
-        "elevationGainM": 400,
-        "durationDays": 1,
-        "tags": ["volcano", "flowers", "gia-lai"]
-      },
-      {
-        "id": 2,
-        "name": "Núi Chứa Chan",
-        "location": "Đồng Nai",
-        "description": "Cung đường trekking quốc dân gần Sài Gòn.",
-        "imageUrl": "https://images.unsplash.com/photo-1470770841072-f978cf4d019e?q=80",
-        "gallery": [],
-        "totalDistanceKm": 10.5,
-        "elevationGainM": 800,
-        "durationDays": 2,
-        "tags": ["mountain", "camping", "dong-nai"]
-      },
-      {
-        "id": 3,
-        "name": "Tà Năng - Phan Dũng",
-        "location": "Lâm Đồng",
-        "description": "Cung đường trekking đẹp nhất Việt Nam.",
-        "imageUrl": "https://images.unsplash.com/photo-1533240332313-0dbdd3199061?q=80",
-        "gallery": [],
-        "totalDistanceKm": 55.0,
-        "elevationGainM": 1100,
-        "durationDays": 3,
-        "tags": ["grassland", "lam-dong"]
+  // Hàm này lấy dữ liệu từ các biến _searchLocation, _accommodation... (Bước 1-5)
+  // Và lấy routeId từ tham số selectedRoute truyền vào
+  Future<void> createPlan(RouteModel selectedRoute) async {
+    try {
+      if (_tripName.isEmpty) throw Exception("Chưa có tên chuyến đi");
+
+      // Xử lý group size
+      int size = 1;
+      if (_paxGroup != null && _paxGroup!.contains('3-6')) size = 5;
+      if (_paxGroup != null && _paxGroup!.contains('7+')) size = 8;
+
+      // GỌI SERVICE LƯU VÀO DB
+      await _supabaseDb.createPlan(
+        name: _tripName,
+        routeId: selectedRoute.id, // Quan trọng: Đây là ID lấp vào chỗ NULL trong ảnh
+        location: _searchLocation,
+        restType: _accommodation ?? 'Không xác định',
+        groupSize: size,
+        startDate: _startDate?.toIso8601String().split('T').first ?? DateTime.now().toString(),
+        durationDays: durationDays,
+        difficulty: _difficultyLevel ?? 'Vừa phải',
+        personalInterests: _selectedInterests,
+      );
+
+      debugPrint("✅ Đã tạo Plan thành công cho route: ${selectedRoute.name}");
+
+      // Không reset vội, để người dùng còn thấy data nếu cần
+      // resetTrip();
+
+    } catch (e) {
+      debugPrint("❌ Lỗi Provider createPlan: $e");
+      rethrow;
+    }
+  }
+
+  // --- FEATURE QUAN TRỌNG NHẤT: FETCH ROUTES ---
+  // Đã chuyển sang gọi Supabase trực tiếp
+  Future<List<RouteModel>> fetchSuggestedRoutes() async {
+    try {
+      debugPrint("1️⃣ Bắt đầu quy trình gợi ý thông minh...");
+
+      // Bước A: Lấy dữ liệu thô từ Supabase (Lọc sơ bộ)
+      final rawData = await _supabaseDb.getSuggestedRoutes(
+        location: _searchLocation, // Lọc theo địa điểm user nhập
+        difficulty: null,          // Mẹo: Lấy tất cả độ khó để AI có nhiều lựa chọn hơn
+        accommodation: _accommodation,
+        durationDays: durationDays,
+      );
+
+      // Convert sang List RouteModel
+      List<RouteModel> initialRoutes = rawData.map((item) => RouteModel.fromJson(item)).toList();
+
+      // Nếu Supabase không tìm thấy gì, trả về rỗng luôn
+      if (initialRoutes.isEmpty) {
+        debugPrint("⚠️ Supabase không tìm thấy cung đường nào khớp bộ lọc cơ bản.");
+        return [];
       }
-    ];
 
-    // LOGIC LỌC OFFLINE
-    if (_searchLocation.isNotEmpty) {
-      final query = _removeDiacritics(_searchLocation).toLowerCase();
+      // Bước B: Gửi cho AI phân tích (Tinh chỉnh & Viết lời khuyên)
+      debugPrint("2️⃣ Gửi ${initialRoutes.length} cung đường cho Gemini...");
 
-      final filtered = backupRoutes.where((r) {
-        final loc = _removeDiacritics(r['location'].toString()).toLowerCase();
-        final name = _removeDiacritics(r['name'].toString()).toLowerCase();
-        return loc.contains(query) || name.contains(query);
-      }).toList();
+      final aiRoutes = await _geminiService.recommendRoutes(
+        allRoutes: initialRoutes,
+        userLocation: _searchLocation,
+        userInterests: _selectedInterests.join(", "), // VD: "Săn mây, Cắm trại"
+        userExperience: _difficultyLevel ?? "Người mới",
+        duration: "$durationDays ngày",
+        groupSize: _paxGroup ?? "Nhóm nhỏ",
+      );
 
-      // FIX 2: Nếu lọc Offline ra rỗng, trả về rỗng luôn.
-      // Điều này giúp UI hiển thị thông báo "Không tìm thấy chuyến đi nào ở [Địa điểm]"
-      // Thay vì tự động hiện lại toàn bộ danh sách gây khó hiểu.
-      return filtered;
+      return aiRoutes;
+
+    } catch (e) {
+      debugPrint("❌ Lỗi Provider: $e");
+      return [];
     }
-
-    return backupRoutes;
   }
 
-  String _removeDiacritics(String str) {
-    const withDia = 'áàảãạăắằẳẵặâấầẩẫậđéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵ';
-    const withoutDia = 'aaaaaaaaaaaaaaaaadeeeeeeeeeeeiiiiiooooooooooooooooouuuuuuuuuuuyyyyy';
-    var result = str;
-    for (int i = 0; i < withDia.length; i++) {
-      result = result.replaceAll(withDia[i], withoutDia[i]);
-    }
-    return result;
-  }
-
-  // --- FEATURE 4: RESET ---
+  // Hàm reset
   void resetTrip() {
     _searchLocation = '';
     _accommodation = null;
@@ -271,6 +286,7 @@ class TripProvider with ChangeNotifier {
     _note = '';
     _selectedInterests = [];
     _tripName = '';
+    _currentPlanId = null; // Reset ID too
     notifyListeners();
   }
 }

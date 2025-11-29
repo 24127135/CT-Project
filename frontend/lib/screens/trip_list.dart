@@ -123,7 +123,7 @@ class _TripListViewState extends State<TripListView> {
                               }
                               try {
                                 final id = (idVal is int) ? idVal : int.parse(idVal.toString());
-                                await _db.deletePlan(id);
+                                //await _db.deletePlan(id);
                                 if (!mounted) return;
                                 scaffold.showSnackBar(const SnackBar(content: Text('Đã xóa chuyến đi'), backgroundColor: Colors.green));
                                 setState(() {

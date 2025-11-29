@@ -1,29 +1,109 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:frontend/features/preference_matching/models/route_model.dart';
 import 'package:frontend/utils/app_colors.dart';
 import 'package:frontend/utils/app_styles.dart';
 import 'package:frontend/widgets/custom_button.dart';
+import 'package:frontend/providers/trip_provider.dart';
+import 'package:frontend/screens/PEC.dart';
 
-class InteractiveMapPage extends StatelessWidget {
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:frontend/services/gemini_service.dart';
+
+class InteractiveMapPage extends StatefulWidget {
   final RouteModel route;
 
   const InteractiveMapPage({super.key, required this.route});
+
+  @override
+  State<InteractiveMapPage> createState() => _InteractiveMapPageState();
+}
+
+class _InteractiveMapPageState extends State<InteractiveMapPage> {
+  bool _isLoading = false;
+
+  Future<void> _confirmRoute(BuildContext context) async {
+    setState(() => _isLoading = true);
+    print("🔴 [InteractiveMapPage] Confirm button pressed for Route ID: ${widget.route.id}");
+
+    try {
+      final tripProvider = Provider.of<TripProvider>(context, listen: false);
+      
+      // --- NEW STEP 1: Fetch Equipment Catalog from Supabase ---
+      // We need this to give to Gemini so it knows what IDs to pick
+      final supabase = Supabase.instance.client;
+      final equipmentResponse = await supabase.from('equipment').select('id, name, category');
+      final List<Map<String, dynamic>> equipmentList = List<Map<String, dynamic>>.from(equipmentResponse);
+
+      // --- NEW STEP 2: Prepare User Profile Data ---
+      // You might need to get this from TripProvider or pass it into this widget
+      // Assuming TripProvider has access to the current plan details
+      // For now, I will use some safe defaults or data from the route
+      final userProfile = {
+        "difficulty": "Vừa phải", // Replace with real user data if available
+        "group_size": 2,         // Replace with real user data
+        "interests": ["Cảnh đẹp", "Leo núi"], // Replace with real user data
+      };
+
+      // --- NEW STEP 3: Call Gemini to Generate JSON ---
+      final geminiService = GeminiService(); // Or use Provider/GetIt if you have dependency injection
+      
+      Map<String, dynamic> aiGeneratedChecklist = {};
+      
+      try {
+        aiGeneratedChecklist = await geminiService.generateChecklist(
+          route: widget.route,
+          userProfile: userProfile,
+          allEquipment: equipmentList,
+        );
+      } catch (aiError) {
+        print("⚠️ Gemini Error: $aiError. Proceeding with empty list.");
+        // We continue even if AI fails, passing an empty list
+      }
+
+      // --- NEW STEP 4: Update Plan in Backend ---
+      // We pass the route ID AND the generated list
+      await tripProvider.confirmRouteForPlan(
+        widget.route.id, 
+        checklist: aiGeneratedChecklist // <--- You need to update TripProvider to accept this
+      );
+      
+      print("🔴 [InteractiveMapPage] Plan updated successfully with AI Checklist.");
+
+      if (!mounted) return;
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const PECScreen()),
+      );
+      
+    } catch (e) {
+      print("🔴 [InteractiveMapPage] ERROR: $e");
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Lỗi: $e'), backgroundColor: Colors.red),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Stack(
         children: [
-          // Map Background (Replaced missing asset with a network image)
+          // Map Background
           Container(
-            color: AppColors.lightGray, // A neutral background for the map area
+            color: AppColors.lightGray,
             child: Image.network(
-              'https://images.unsplash.com/photo-1585435465945-597426701a4d?q=80&w=1974&auto=format&fit=crop',
+              widget.route.imageUrl.isNotEmpty 
+                  ? widget.route.imageUrl 
+                  : 'https://images.unsplash.com/photo-1585435465945-597426701a4d?q=80&w=1974&auto=format&fit=crop',
               fit: BoxFit.cover,
               height: double.infinity,
               width: double.infinity,
-              // Add a loading builder for a better user experience
-              loadingBuilder: (BuildContext context, Widget child, ImageChunkEvent? loadingProgress) {
+              loadingBuilder: (context, child, loadingProgress) {
                 if (loadingProgress == null) return child;
                 return Center(
                   child: CircularProgressIndicator(
@@ -33,11 +113,12 @@ class InteractiveMapPage extends StatelessWidget {
                   ),
                 );
               },
-              errorBuilder: (context, error, stackTrace) => const Center(child: Icon(Icons.map_outlined, color: AppColors.textGray, size: 60)),
+              errorBuilder: (context, error, stackTrace) => 
+                  const Center(child: Icon(Icons.map_outlined, color: AppColors.textGray, size: 60)),
             ),
           ),
 
-          // Top buttons (Back, 3D)
+          // Top buttons
           Positioned(
             top: MediaQuery.of(context).padding.top + 12,
             left: 16,
@@ -70,10 +151,10 @@ class InteractiveMapPage extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // Title and Stats
-                      Text('${route.name} - ${route.location}', style: AppStyles.mapTitle),
+                      Text('${widget.route.name} - ${widget.route.location}', style: AppStyles.mapTitle),
                       const SizedBox(height: 8),
                       Text(
-                        '${route.distanceKm} km, ${route.elevationGainM} m gain, Est. ${route.durationDays} days',
+                        '${widget.route.distanceKm} km, ${widget.route.elevationGainM} m gain, Est. ${widget.route.durationDays} days',
                         style: AppStyles.mapStats,
                       ),
                       const SizedBox(height: 24),
@@ -92,19 +173,23 @@ class InteractiveMapPage extends StatelessWidget {
                       // AI Note
                       const Text('AI Note:', style: AppStyles.aiNoteTitle),
                       const SizedBox(height: 8),
-                      const Text(
-                        'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Pellentesque euismod, urna eu tincidunt consectetur, nisi nisl aliquet nunc, eget aliquam nisl nunc eget nisl.',
+                      Text(
+                        widget.route.aiNote.isNotEmpty 
+                          ? widget.route.aiNote 
+                          : 'Thông tin địa hình và thời tiết đang được cập nhật...',
                         style: AppStyles.bodyText,
                       ),
                       const SizedBox(height: 32),
 
                       // Confirm Button
-                      CustomButton(
-                        text: 'XÁC NHẬN LỘ TRÌNH',
-                        onPressed: () {},
-                        backgroundColor: AppColors.primaryGreen,
-                        style: AppStyles.profileButton.copyWith(color: Colors.white),
-                      ),
+                      _isLoading 
+                        ? const Center(child: CircularProgressIndicator(color: AppColors.primaryGreen))
+                        : CustomButton(
+                            text: 'XÁC NHẬN LỘ TRÌNH',
+                            onPressed: () => _confirmRoute(context),
+                            backgroundColor: AppColors.primaryGreen,
+                            style: AppStyles.profileButton.copyWith(color: Colors.white),
+                          ),
                     ],
                   ),
                 ),
