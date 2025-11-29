@@ -105,7 +105,7 @@ class SupabaseDbService {
 
   Future<Map<String, dynamic>> createPlan({
     required String name,
-    int? routeId, // 👈 SỬA: Đổi từ "required int routeId" thành "int? routeId" (cho phép null)
+    int? routeId,
     required String location,
     required String restType,
     required int groupSize,
@@ -120,7 +120,7 @@ class SupabaseDbService {
     final payload = {
       'user_id': uid,
       'name': name,
-      'route_id': routeId, // Nếu null, Supabase sẽ lưu là NULL
+      'route_id': routeId,
       'location': location,
       'rest_type': restType,
       'group_size': groupSize,
@@ -133,6 +133,31 @@ class SupabaseDbService {
     final res = await _client.from('plans').insert(payload).select().single();
     return Map<String, dynamic>.from(res);
   }
+
+  // ---------------------------------------------------------------------------
+  // [START] ADD THIS NEW METHOD FOR UPDATING THE PLAN (FIX FOR INTERACTIVE MAP)
+  // ---------------------------------------------------------------------------
+  Future<Map<String, dynamic>> updatePlanRoute(int planId, int routeId) async {
+    final uid = _uid;
+    if (uid == null) throw Exception('Not signed in');
+
+    print("🔄 Sending PATCH update to Supabase for Plan ID: $planId with Route ID: $routeId");
+
+    // This sends a PATCH request to update ONLY the route_id of an existing plan.
+    // The backend (Django) serializer's update() method will detect this change
+    // and automatically trigger the AI logic to generate the equipment list.
+    final res = await _client
+        .from('plans')
+        .update({'route_id': routeId})
+        .eq('id', planId)
+        .select()
+        .single();
+        
+    return Map<String, dynamic>.from(res);
+  }
+  // ---------------------------------------------------------------------------
+  // [END] NEW METHOD
+  // ---------------------------------------------------------------------------
 
   // --- 4. HISTORY INPUTS ---
 

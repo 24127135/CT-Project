@@ -23,6 +23,9 @@ class TripProvider with ChangeNotifier {
   List<String> _selectedInterests = [];
   String _tripName = '';
 
+  int? _currentPlanId; 
+  int? get currentPlanId => _currentPlanId;
+
   // --- Getters ---
   String get searchLocation => _searchLocation;
   String? get accommodation => _accommodation;
@@ -122,37 +125,52 @@ class TripProvider with ChangeNotifier {
   }
   // Trong TripProvider
 
-  // --- HÀM MỚI: LƯU INPUT 1-5 VÀO PLAN (ROUTE = NULL) ---
   Future<void> saveTripRequest() async {
     try {
-      // 1. Validate dữ liệu cơ bản
       if (_tripName.isEmpty) throw Exception("Vui lòng đặt tên cho chuyến đi");
       if (_startDate == null) throw Exception("Vui lòng chọn ngày khởi hành");
 
-      // 2. Xử lý Group Size
-      int size = 1;
-      if (_paxGroup == 'Đơn lẻ (1-2 người)') size = 2;
-      else if (_paxGroup == 'Nhóm nhỏ (3-6 người)') size = 5;
-      else if (_paxGroup == 'Nhóm đông (7+ người)') size = 8;
-
-      // 3. Gọi Service lưu vào bảng 'plans'
-      await _supabaseDb.createPlan(
+      // Call Service to create INITIAL plan
+      final response = await _supabaseDb.createPlan(
         name: _tripName,
-        routeId: null, // 👈 QUAN TRỌNG: Truyền null vì chưa chọn Route
+        routeId: null, // Route is null initially
         location: _searchLocation,
         restType: _accommodation ?? 'Không xác định',
-        groupSize: size,
+        groupSize: parsedGroupSize,
         startDate: _startDate!.toIso8601String().split('T').first,
         durationDays: durationDays,
         difficulty: _difficultyLevel ?? 'Vừa phải',
         personalInterests: _selectedInterests,
       );
 
-      debugPrint("✅ Đã lưu yêu cầu chuyến đi (Bước 1-5) vào Plans!");
+      // 🟢 STORE THE ID for later use
+      if (response['id'] != null) {
+        _currentPlanId = response['id'];
+        debugPrint("✅ Draft Plan Saved. ID: $_currentPlanId");
+      }
 
     } catch (e) {
-      debugPrint("❌ Lỗi lưu Trip Request: $e");
-      rethrow; // Ném lỗi để UI biết mà hiện thông báo
+      debugPrint("❌ Error saving trip request: $e");
+      rethrow;
+    }
+  }
+
+  Future<void> confirmRouteForPlan(int routeId) async {
+    try {
+      if (_currentPlanId == null) {
+        throw Exception("Lỗi: Không tìm thấy ID chuyến đi. Vui lòng tạo lại.");
+      }
+
+      debugPrint("🔄 Updating Plan $_currentPlanId with Route $routeId...");
+
+      // Call Update Method
+      await _supabaseDb.updatePlanRoute(_currentPlanId!, routeId);
+
+      debugPrint("✅ Plan updated with Route ID. Ready for PEC.");
+      
+    } catch (e) {
+      debugPrint("❌ Error confirming route: $e");
+      rethrow;
     }
   }
 
@@ -164,7 +182,7 @@ class TripProvider with ChangeNotifier {
       'location': _searchLocation,
       'rest_type': _accommodation,
       'group_size': parsedGroupSize,
-      'start_date': _startDate != null ? DateTime(_startDate!.year, _startDate!.month, _startDate!.day).toIso8601String().split('T').first : null,
+      'start_date': _startDate?.toIso8601String().split('T').first,
       'duration_days': durationDays,
       'difficulty': _difficultyLevel,
       'personal_interests': _selectedInterests,
@@ -172,8 +190,6 @@ class TripProvider with ChangeNotifier {
     await _supabaseDb.saveHistoryInput(name, payload);
   }
   // Trong TripProvider.dart
-
-  // Trong TripProvider
 
   // Hàm này lấy dữ liệu từ các biến _searchLocation, _accommodation... (Bước 1-5)
   // Và lấy routeId từ tham số selectedRoute truyền vào
@@ -263,6 +279,7 @@ class TripProvider with ChangeNotifier {
     _note = '';
     _selectedInterests = [];
     _tripName = '';
+    _currentPlanId = null; // Reset ID too
     notifyListeners();
   }
 }

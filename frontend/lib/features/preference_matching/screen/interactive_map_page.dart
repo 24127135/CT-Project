@@ -5,7 +5,6 @@ import 'package:frontend/utils/app_colors.dart';
 import 'package:frontend/utils/app_styles.dart';
 import 'package:frontend/widgets/custom_button.dart';
 import 'package:frontend/providers/trip_provider.dart';
-import 'package:frontend/services/api_service.dart';
 import 'package:frontend/screens/PEC.dart';
 
 class InteractiveMapPage extends StatefulWidget {
@@ -21,51 +20,24 @@ class _InteractiveMapPageState extends State<InteractiveMapPage> {
   bool _isLoading = false;
 
   Future<void> _confirmRoute(BuildContext context) async {
-    // 1. Set loading state
     setState(() => _isLoading = true);
     
-    print("🔴 [InteractiveMapPage] Confirm button pressed");
+    print("🔴 [InteractiveMapPage] Confirm button pressed for Route ID: ${widget.route.id}");
 
     try {
-      // 2. Get user inputs from the TripProvider
+      // 1. Get Provider
       final tripProvider = Provider.of<TripProvider>(context, listen: false);
-      
-      print("🔴 [InteractiveMapPage] Provider data: Name=${tripProvider.tripName}, Location=${tripProvider.searchLocation}");
 
-
-      // 3. Construct the payload for the Django Backend
-      // Note: We map 'route_id' to 'route' as per your API spec.
-      // Ensure widget.route.id corresponds to the ID in your database.
-      final Map<String, dynamic> payload = {
-        "name": tripProvider.tripName.isNotEmpty 
-            ? tripProvider.tripName 
-            : "Chuyến đi đến ${widget.route.location}",
-        "route": widget.route.id, // Sending the Route ID
-        "location": tripProvider.searchLocation,
-        "rest_type": tripProvider.accommodation ?? "Unknown", // Default if null
-        "group_size": tripProvider.parsedGroupSize,
-        // Formatting Date to YYYY-MM-DD
-        "start_date": tripProvider.startDate?.toIso8601String().split('T').first ?? DateTime.now().toIso8601String().split('T').first,
-        "duration_days": tripProvider.durationDays,
-        "difficulty": tripProvider.difficultyLevel ?? "Medium", // Default
-        "personal_interest": tripProvider.selectedInterests,
-      };
+      // 2. Call the UPDATE method (Step 6 logic)
+      // This avoids creating a new duplicate plan and fixes the 400 error
+      await tripProvider.confirmRouteForPlan(widget.route.id);
       
-      print("🔴 [InteractiveMapPage] Payload: $payload");
-
-      // 4. Call the Backend API
-      final apiService = ApiService();
-      print("🔴 [InteractiveMapPage] Calling ApiService.createPlan...");
-      
-      // This request triggers the Python logic to generate the PEC list
-      final responseData = await apiService.createPlan(payload);
-      
-      print("🔴 [InteractiveMapPage] API Success! Response: $responseData");
+      print("🔴 [InteractiveMapPage] Plan updated successfully.");
 
       if (!mounted) return;
 
-      // 5. Navigate to PEC Screen
-      // Pass the responseData if needed by PECScreen (e.g. plan ID)
+      // 3. Navigate to PEC Screen
+      // Use push so user can go back if needed, or pushReplacement if this is a one-way flow
       Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => const PECScreen()),
@@ -74,8 +46,18 @@ class _InteractiveMapPageState extends State<InteractiveMapPage> {
     } catch (e) {
       print("🔴 [InteractiveMapPage] ERROR: $e");
       if (!mounted) return;
+      
+      String errorMessage = 'Lỗi kết nối server.';
+      if (e.toString().contains('Không tìm thấy ID')) {
+        errorMessage = 'Lỗi quy trình: Không tìm thấy bản nháp chuyến đi.';
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Lỗi kết nối server: $e')),
+        SnackBar(
+          content: Text(errorMessage),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 3),
+        ),
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -91,7 +73,6 @@ class _InteractiveMapPageState extends State<InteractiveMapPage> {
           Container(
             color: AppColors.lightGray,
             child: Image.network(
-              // Using a valid image URL or fallback
               widget.route.imageUrl.isNotEmpty 
                   ? widget.route.imageUrl 
                   : 'https://images.unsplash.com/photo-1585435465945-597426701a4d?q=80&w=1974&auto=format&fit=crop',
@@ -168,9 +149,10 @@ class _InteractiveMapPageState extends State<InteractiveMapPage> {
                       // AI Note
                       const Text('AI Note:', style: AppStyles.aiNoteTitle),
                       const SizedBox(height: 8),
-                      // Use actual AI note if available, else dummy text
                       Text(
-                        widget.route.aiNote ?? 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Pellentesque euismod, urna eu tincidunt consectetur...',
+                        widget.route.aiNote.isNotEmpty 
+                          ? widget.route.aiNote 
+                          : 'Thông tin địa hình và thời tiết đang được cập nhật...',
                         style: AppStyles.bodyText,
                       ),
                       const SizedBox(height: 32),
