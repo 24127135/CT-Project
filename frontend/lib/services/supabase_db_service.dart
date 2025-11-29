@@ -11,14 +11,13 @@ class SupabaseDbService {
   Future<List<Map<String, dynamic>>> getSuggestedRoutes({
     String? location,
     String? difficulty,
-    String? accommodation, // MỚI: Cắm trại / Homestay / Kết hợp
-    int? durationDays,     // MỚI: Số ngày đi
+    String? accommodation,
+    int? durationDays,
   }) async {
     try {
       // 1. Lấy dữ liệu thô từ DB
       var query = _client.from('routes').select();
 
-      // Lọc độ khó tại DB
       if (difficulty != null && difficulty.isNotEmpty) {
         query = query.eq('difficulty_level', difficulty);
       }
@@ -26,14 +25,12 @@ class SupabaseDbService {
       final res = await query.order('id', ascending: true);
       List<Map<String, dynamic>> routes = List<Map<String, dynamic>>.from(res as List<dynamic>);
 
-      // 2. Lọc Logic phía Client (Dart)
-
-      // Chuẩn hóa input tìm kiếm
+      // 2. Lọc Logic phía Client
       final keyword = (location ?? '').toLowerCase().trim();
-      final accomFilter = (accommodation ?? '').toLowerCase().trim(); // "cắm trại", "homestay"
+      final accomFilter = (accommodation ?? '').toLowerCase().trim();
 
       routes = routes.where((route) {
-        // --- A. Lọc Location ---
+        // A. Lọc Location
         if (keyword.isNotEmpty) {
           final name = (route['name'] ?? '').toString().toLowerCase();
           final desc = (route['description'] ?? '').toString().toLowerCase();
@@ -44,20 +41,14 @@ class SupabaseDbService {
           if (!matchLoc) return false;
         }
 
-        // --- B. Lọc Accommodation (Loại hình ngủ nghỉ) ---
-        // Nếu user chọn "Kết hợp" hoặc không chọn -> Bỏ qua lọc (lấy hết)
-        // Nếu chọn "Cắm trại" hoặc "Homestay" -> Bắt buộc route phải có tag đó
+        // B. Lọc Accommodation
         if (accomFilter.isNotEmpty && !accomFilter.contains('kết hợp')) {
           final tagsList = route['tags'] as List<dynamic>? ?? [];
           final tagsString = tagsList.join(' ').toLowerCase();
-
-          // Kiểm tra xem tag của route có chứa loại hình user chọn không
           if (!tagsString.contains(accomFilter)) return false;
         }
 
-        // --- C. Lọc Duration (Số ngày) ---
-        // Logic: Lấy các cung đường có thời gian chênh lệch <= 1 ngày so với user chọn
-        // VD: User đi 3 ngày -> Gợi ý cung 2, 3, 4 ngày.
+        // C. Lọc Duration
         if (durationDays != null) {
           final routeDays = (route['estimated_duration_days'] ?? 0) as int;
           if ((routeDays - durationDays).abs() > 1) return false;
@@ -73,14 +64,7 @@ class SupabaseDbService {
       return [];
     }
   }
-  /// Delete a plan by id (only if it belongs to current user)
-  Future<void> deletePlan(int id) async {
-    final uid = _uid;
-    if (uid == null) throw Exception('Not signed in');
 
-    // Xóa trong bảng 'plans' với id tương ứng và phải thuộc về user hiện tại
-    await _client.from('plans').delete().eq('id', id).eq('user_id', uid);
-  }
   // --- 2. USER PROFILES ---
 
   Future<Map<String, dynamic>?> getProfile() async {
@@ -107,12 +91,47 @@ class SupabaseDbService {
     return await _client.from('plans').select().eq('user_id', uid);
   }
 
-  Future<Map<String, dynamic>> createPlan(Map<String, dynamic> body) async {
+  /// Delete a plan by id
+  Future<void> deletePlan(int id) async {
     final uid = _uid;
     if (uid == null) throw Exception('Not signed in');
-    final payload = Map<String, dynamic>.from(body);
-    payload['user_id'] = uid;
-    return await _client.from('plans').insert(payload).select().single();
+    await _client.from('plans').delete().eq('id', id).eq('user_id', uid);
+  }
+
+  // ✅ ĐÃ SỬA: Chỉ giữ lại 1 hàm createPlan chính xác nhất
+  // Trong class SupabaseDbService
+
+  // Trong SupabaseDbService
+
+  Future<Map<String, dynamic>> createPlan({
+    required String name,
+    int? routeId, // 👈 SỬA: Đổi từ "required int routeId" thành "int? routeId" (cho phép null)
+    required String location,
+    required String restType,
+    required int groupSize,
+    required String startDate,
+    required int durationDays,
+    required String difficulty,
+    required List<String> personalInterests,
+  }) async {
+    final uid = _uid;
+    if (uid == null) throw Exception('Not signed in');
+
+    final payload = {
+      'user_id': uid,
+      'name': name,
+      'route_id': routeId, // Nếu null, Supabase sẽ lưu là NULL
+      'location': location,
+      'rest_type': restType,
+      'group_size': groupSize,
+      'start_date': startDate,
+      'duration_days': durationDays,
+      'difficulty': difficulty,
+      'personal_interests': personalInterests,
+    };
+
+    final res = await _client.from('plans').insert(payload).select().single();
+    return Map<String, dynamic>.from(res);
   }
 
   // --- 4. HISTORY INPUTS ---
@@ -137,7 +156,7 @@ class SupabaseDbService {
     final Map<String, dynamic> data = {};
     data['user_id'] = uid;
     data['template_name'] = name;
-    // Map các trường payload linh hoạt
+
     data['location'] = payload['location'] ?? payload['payload']?['location'];
     data['rest_type'] = payload['rest_type'] ?? payload['payload']?['rest_type'] ?? payload['accommodation'];
     data['group_size'] = payload['group_size'] ?? payload['payload']?['group_size'] ?? payload['pax_group'];
@@ -145,7 +164,6 @@ class SupabaseDbService {
     data['duration_days'] = payload['duration_days'] ?? payload['payload']?['duration_days'];
     data['difficulty'] = payload['difficulty'] ?? payload['payload']?['difficulty'] ?? payload['difficulty_level'];
 
-    // Xử lý mảng interests
     var interests = payload['personal_interest'] ?? payload['personal_interests'] ?? payload['interests'];
     if (interests is List) {
       data['personal_interests'] = interests;

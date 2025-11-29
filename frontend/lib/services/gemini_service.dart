@@ -6,7 +6,7 @@ import 'package:http/http.dart' as http;
 
 class GeminiService {
   // ⚠️ THAY KEY CỦA BẠN VÀO ĐÂY
-  static const String _apiKey = 'AIzaSyCRi6m83AvDY75DTMUvF7IIfw0BnSXhy20';
+  static const String _apiKey = 'AIzaSyAFhSGCwB4b7l4rvGpSAM75XHToJwIWA74';
 
   late final GenerativeModel _model;
 

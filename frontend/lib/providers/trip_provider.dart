@@ -120,6 +120,41 @@ class TripProvider with ChangeNotifier {
     _tripName = data['template_name'] ?? data['name'] ?? _tripName;
     notifyListeners();
   }
+  // Trong TripProvider
+
+  // --- HÀM MỚI: LƯU INPUT 1-5 VÀO PLAN (ROUTE = NULL) ---
+  Future<void> saveTripRequest() async {
+    try {
+      // 1. Validate dữ liệu cơ bản
+      if (_tripName.isEmpty) throw Exception("Vui lòng đặt tên cho chuyến đi");
+      if (_startDate == null) throw Exception("Vui lòng chọn ngày khởi hành");
+
+      // 2. Xử lý Group Size
+      int size = 1;
+      if (_paxGroup == 'Đơn lẻ (1-2 người)') size = 2;
+      else if (_paxGroup == 'Nhóm nhỏ (3-6 người)') size = 5;
+      else if (_paxGroup == 'Nhóm đông (7+ người)') size = 8;
+
+      // 3. Gọi Service lưu vào bảng 'plans'
+      await _supabaseDb.createPlan(
+        name: _tripName,
+        routeId: null, // 👈 QUAN TRỌNG: Truyền null vì chưa chọn Route
+        location: _searchLocation,
+        restType: _accommodation ?? 'Không xác định',
+        groupSize: size,
+        startDate: _startDate!.toIso8601String().split('T').first,
+        durationDays: durationDays,
+        difficulty: _difficultyLevel ?? 'Vừa phải',
+        personalInterests: _selectedInterests,
+      );
+
+      debugPrint("✅ Đã lưu yêu cầu chuyến đi (Bước 1-5) vào Plans!");
+
+    } catch (e) {
+      debugPrint("❌ Lỗi lưu Trip Request: $e");
+      rethrow; // Ném lỗi để UI biết mà hiện thông báo
+    }
+  }
 
   Future<void> saveHistoryInput(String name) async {
     if (_searchLocation.isEmpty || _accommodation == null || _paxGroup == null || _difficultyLevel == null) {
@@ -136,7 +171,44 @@ class TripProvider with ChangeNotifier {
     };
     await _supabaseDb.saveHistoryInput(name, payload);
   }
+  // Trong TripProvider.dart
 
+  // Trong TripProvider
+
+  // Hàm này lấy dữ liệu từ các biến _searchLocation, _accommodation... (Bước 1-5)
+  // Và lấy routeId từ tham số selectedRoute truyền vào
+  Future<void> createPlan(RouteModel selectedRoute) async {
+    try {
+      if (_tripName.isEmpty) throw Exception("Chưa có tên chuyến đi");
+
+      // Xử lý group size
+      int size = 1;
+      if (_paxGroup != null && _paxGroup!.contains('3-6')) size = 5;
+      if (_paxGroup != null && _paxGroup!.contains('7+')) size = 8;
+
+      // GỌI SERVICE LƯU VÀO DB
+      await _supabaseDb.createPlan(
+        name: _tripName,
+        routeId: selectedRoute.id, // Quan trọng: Đây là ID lấp vào chỗ NULL trong ảnh
+        location: _searchLocation,
+        restType: _accommodation ?? 'Không xác định',
+        groupSize: size,
+        startDate: _startDate?.toIso8601String().split('T').first ?? DateTime.now().toString(),
+        durationDays: durationDays,
+        difficulty: _difficultyLevel ?? 'Vừa phải',
+        personalInterests: _selectedInterests,
+      );
+
+      debugPrint("✅ Đã tạo Plan thành công cho route: ${selectedRoute.name}");
+
+      // Không reset vội, để người dùng còn thấy data nếu cần
+      // resetTrip();
+
+    } catch (e) {
+      debugPrint("❌ Lỗi Provider createPlan: $e");
+      rethrow;
+    }
+  }
   // --- FEATURE QUAN TRỌNG NHẤT: FETCH ROUTES ---
   // Đã chuyển sang gọi Supabase trực tiếp
   Future<List<RouteModel>> fetchSuggestedRoutes() async {

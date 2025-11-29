@@ -33,7 +33,7 @@ class Plan(models.Model):
     start_date = models.DateField()
     duration_days = models.IntegerField()
     difficulty = models.TextField()
-    personal_interest = models.JSONField()
+    dangers_snapshot = models.JSONField(null=True, blank=True)
     # --- ---
 
     # Dữ liệu do AI/Service tạo ra [cite: 1343]
