@@ -11,7 +11,7 @@ import 'services/session_lifecycle_service.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 Future<void> main() async {
-  
+  // load API key first
   await dotenv.load(fileName: ".env");
   
   WidgetsFlutterBinding.ensureInitialized();
