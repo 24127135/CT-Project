@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:frontend/providers/trip_provider.dart'; // Ensure this path is correct
-
+import 'package:frontend/providers/trip_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:frontend/screens/trip_dashboard.dart';
 
 class PECScreen extends StatelessWidget {
   final int? planId;
@@ -318,6 +318,12 @@ class _PECContentState extends State<PECContent> {
           content: Text("Đã lưu danh sách trang bị!"),
           backgroundColor: Colors.green,
         ));
+
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const TripDashboard()),
+          (Route<dynamic> route) => route.isFirst, // Go back to Home first or keep stack clean
+        );
       }
     } catch (e) {
       debugPrint("Error saving checklist: $e");

@@ -1,13 +1,13 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'danger_labels.dart'; // Ensure this file exists from the 'tri' branch
 
 class SupabaseDbService {
   final _client = Supabase.instance.client;
 
   String? get _uid => _client.auth.currentUser?.id;
 
-  // --- 1. ROUTES (CUNG ĐƯỜNG) ---
+  // --- 1. ROUTES ---
 
-  /// Lấy danh sách cung đường gợi ý từ bảng 'routes'
   Future<List<Map<String, dynamic>>> getSuggestedRoutes({
     String? location,
     String? difficulty,
@@ -15,7 +15,6 @@ class SupabaseDbService {
     int? durationDays,
   }) async {
     try {
-      // 1. Lấy dữ liệu thô từ DB
       var query = _client.from('routes').select();
 
       if (difficulty != null && difficulty.isNotEmpty) {
@@ -25,47 +24,38 @@ class SupabaseDbService {
       final res = await query.order('id', ascending: true);
       List<Map<String, dynamic>> routes = List<Map<String, dynamic>>.from(res as List<dynamic>);
 
-      // 2. Lọc Logic phía Client
       final keyword = (location ?? '').toLowerCase().trim();
       final accomFilter = (accommodation ?? '').toLowerCase().trim();
 
       routes = routes.where((route) {
-        // A. Lọc Location
         if (keyword.isNotEmpty) {
           final name = (route['name'] ?? '').toString().toLowerCase();
           final desc = (route['description'] ?? '').toString().toLowerCase();
           final tagsList = route['tags'] as List<dynamic>? ?? [];
           final tagsString = tagsList.join(' ').toLowerCase();
-
           bool matchLoc = name.contains(keyword) || desc.contains(keyword) || tagsString.contains(keyword);
           if (!matchLoc) return false;
         }
-
-        // B. Lọc Accommodation
         if (accomFilter.isNotEmpty && !accomFilter.contains('kết hợp')) {
           final tagsList = route['tags'] as List<dynamic>? ?? [];
           final tagsString = tagsList.join(' ').toLowerCase();
           if (!tagsString.contains(accomFilter)) return false;
         }
-
-        // C. Lọc Duration
         if (durationDays != null) {
           final routeDays = (route['estimated_duration_days'] ?? 0) as int;
           if ((routeDays - durationDays).abs() > 1) return false;
         }
-
         return true;
       }).toList();
 
       return routes;
-
     } catch (e) {
       print("❌ Lỗi Logic: $e");
       return [];
     }
   }
 
-  // --- 2. USER PROFILES ---
+  // --- 2. PROFILES ---
 
   Future<Map<String, dynamic>?> getProfile() async {
     final uid = _uid;
@@ -85,19 +75,22 @@ class SupabaseDbService {
 
   // --- 3. PLANS ---
 
+  // [MERGED] From 'tri': Include 'routes' relation for Dashboard UI
   Future<List<dynamic>> getPlans() async {
     final uid = _uid;
     if (uid == null) return [];
-    return await _client.from('plans').select().eq('user_id', uid);
+    // Using the relationship to fetch route data immediately
+    final res = await _client.from('plans').select('*, routes(*)').eq('user_id', uid).order('id', ascending: false);
+    return res as List<dynamic>;
   }
 
-  /// Delete a plan by id
   Future<void> deletePlan(int id) async {
     final uid = _uid;
     if (uid == null) throw Exception('Not signed in');
     await _client.from('plans').delete().eq('id', id).eq('user_id', uid);
   }
 
+  // [MERGED] From 'HEAD': Keep Strict Typed Parameters for compatibility with existing Trip Creation UI
   Future<Map<String, dynamic>> createPlan({
     required String name,
     int? routeId,
@@ -129,21 +122,17 @@ class SupabaseDbService {
     return Map<String, dynamic>.from(res);
   }
 
-  // ---------------------------------------------------------------------------
-  // [UPDATED] Update Plan Route AND Checklist
-  // ---------------------------------------------------------------------------
+  // [MERGED] From 'HEAD': Critical for AI PEC flow
   Future<Map<String, dynamic>> updatePlanRoute(int planId, int routeId, {Map<String, dynamic>? checklist}) async {
     final uid = _uid;
     if (uid == null) throw Exception('Not signed in');
 
     print("🔄 Sending PATCH update to Supabase for Plan ID: $planId with Route ID: $routeId");
 
-    // Prepare update payload
     final Map<String, dynamic> updates = {
       'route_id': routeId,
     };
 
-    // If checklist is provided (from Gemini in Frontend), save it directly to DB
     if (checklist != null) {
       updates['personalized_equipment_list'] = checklist;
     }
@@ -156,6 +145,44 @@ class SupabaseDbService {
         .single();
         
     return Map<String, dynamic>.from(res);
+  }
+
+  // [MERGED] From 'tri': Needed for Safety Warning Pop-up
+  Future<String?> getLatestDangerSnapshot() async {
+    final uid = _uid;
+    if (uid == null) return null;
+
+    final res = await _client.from('plans').select('id, dangers_snapshot').eq('user_id', uid).order('id', ascending: false).limit(1).maybeSingle();
+    if (res == null) return null;
+
+    final Map<String, dynamic> row = Map<String, dynamic>.from(res);
+    final val = row['dangers_snapshot'];
+
+    if (val is String && val.trim().isNotEmpty) return val.trim();
+
+    if (val is Map) {
+      final Map m = val;
+      final active = <String>[];
+      m.forEach((k, v) {
+        if (v == true) {
+            final key = k.toString();
+            final label = dangerLabelForKey(key);
+            active.add(label);
+        }
+      });
+      if (active.isNotEmpty) return active.join(', ');
+      return null;
+    }
+
+    if (val is List) {
+      final items = val.where((e) => e != null).map((e) {
+        final key = e.toString();
+        return dangerLabelForKey(key);
+      }).toList();
+      if (items.isNotEmpty) return items.join(', ');
+    }
+
+    return null;
   }
 
   // --- 4. HISTORY INPUTS ---
