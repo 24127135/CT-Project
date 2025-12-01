@@ -1,14 +1,26 @@
+import 'dart:math';
+import 'dart:ui' as ui;
+import 'dart:typed_data';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
-import 'package:url_launcher/url_launcher.dart'; 
+import 'package:url_launcher/url_launcher.dart';
+
+// --- CÁC SERVICE CỦA BẠN ---
 import '../services/supabase_db_service.dart';
 import '../services/plan_service.dart';
 import '../models/plan.dart';
 import '../services/danger_labels.dart';
 import '../services/gemini_service.dart';
+
+// --- IMPORT CHO MAP & CHART ---
+import 'package:maplibre_gl/maplibre_gl.dart'; // 3D Map
+import 'package:flutter_map/flutter_map.dart' as fmap; // 2D Map
+import 'package:latlong2/latlong.dart' as fcoords; // Toạ độ cho 2D Map
+import 'package:fl_chart/fl_chart.dart'; // Biểu đồ
 
 const kBgColor = Color(0xFFF8F6F2);
 const kPrimaryGreen = Color(0xFF38C148);
@@ -26,12 +38,12 @@ class _TripDashboardState extends State<TripDashboard> {
   final SupabaseDbService _db = SupabaseDbService();
   final GeminiService _geminiService = GeminiService();
   late final PlanService _planService = PlanService(db: _db);
-  
+
   Plan? _latestPlan;
   int _activeIndex = 0;
   final PageController _pageController = PageController();
   final List<String> _notes = [];
-  
+
   Map<String, Map<String, dynamic>> _equipmentDetails = {};
 
   String? _aiRouteNote;
@@ -40,6 +52,7 @@ class _TripDashboardState extends State<TripDashboard> {
   @override
   void initState() {
     super.initState();
+    // Tải dữ liệu ngay khi màn hình mở
     SchedulerBinding.instance.addPostFrameCallback((_) => _initSafetyCheck());
   }
 
@@ -109,17 +122,15 @@ class _TripDashboardState extends State<TripDashboard> {
 
   Future<void> _generateAiNote(Plan plan) async {
     if (plan.routes.isEmpty) return;
-    
+
     final route = plan.routes.first;
     if (route.name == null) return;
 
     setState(() => _isLoadingNote = true);
 
-    // Check if we already have an AI note saved in the DB (optional optimization)
-    // For now, we generate it fresh as requested
     final note = await _geminiService.generateRouteNote(
-      route.name!, 
-      plan.location // Using plan location as context
+        route.name!,
+        plan.location
     );
 
     if (mounted) {
@@ -147,16 +158,19 @@ class _TripDashboardState extends State<TripDashboard> {
                 controller: _pageController,
                 onPageChanged: (i) => setState(() => _activeIndex = i),
                 children: [
+                  // Tab 1: Route (Truyền plan vào đây, nếu plan null thì nó hiện loading hoặc fake)
                   _RouteTab(
-                    plan: _latestPlan, 
-                    aiNote: _aiRouteNote, 
-                    isLoadingNote: _isLoadingNote
+                      plan: _latestPlan,
+                      aiNote: _aiRouteNote,
+                      isLoadingNote: _isLoadingNote
                   ),
+                  // Tab 2: Equipment
                   _ItemsTab(
-                    plan: _latestPlan, 
+                    plan: _latestPlan,
                     equipmentDetails: _equipmentDetails,
                     onBuyPressed: _launchBuyLink,
                   ),
+                  // Tab 3: Notes
                   _NotesTab(notes: _notes, onDeleteNote: _deleteNote, onEditNote: _editNote),
                 ],
               ),
@@ -166,10 +180,10 @@ class _TripDashboardState extends State<TripDashboard> {
       ),
       floatingActionButton: _activeIndex == 2
           ? FloatingActionButton(
-              backgroundColor: kPrimaryGreen,
-              onPressed: _navigateAndAddNote,
-              child: const Icon(Icons.add, color: Colors.white),
-            )
+        backgroundColor: kPrimaryGreen,
+        onPressed: _navigateAndAddNote,
+        child: const Icon(Icons.add, color: Colors.white),
+      )
           : null,
     );
   }
@@ -183,6 +197,7 @@ class _TripDashboardState extends State<TripDashboard> {
     final ctx = context;
     final navigator = Navigator.of(ctx);
 
+    // Show loading
     showDialog<void>(
       context: ctx,
       barrierDismissible: false,
@@ -213,6 +228,8 @@ class _TripDashboardState extends State<TripDashboard> {
         if (navigator.canPop()) navigator.pop();
         return;
       }
+
+      // Update State: Plan đã tải xong
       setState(() => _latestPlan = targetPlan);
 
       if (targetPlan != null) {
@@ -220,6 +237,7 @@ class _TripDashboardState extends State<TripDashboard> {
         _generateAiNote(targetPlan);
       }
 
+      // Check Danger
       try {
         final snapshot = await _db.getLatestDangerSnapshot();
         if (snapshot != null) {
@@ -299,7 +317,7 @@ class _TripDashboardState extends State<TripDashboard> {
                 child: Column(mainAxisSize: MainAxisSize.min, children: [
                   Text('CẢNH BÁO NGUY HIỂM', style: TextStyle(color: Colors.red.shade700, fontWeight: FontWeight.w900, fontSize: 18, letterSpacing: 1.6)),
                   const SizedBox(height: 10),
-                     Text(message, textAlign: TextAlign.center, style: TextStyle(fontStyle: FontStyle.italic, height: 1.45, color: Color.fromRGBO(0,0,0,0.85))),
+                  Text(message, textAlign: TextAlign.center, style: TextStyle(fontStyle: FontStyle.italic, height: 1.45, color: Color.fromRGBO(0,0,0,0.85))),
                 ]),
               ),
             ),
@@ -341,11 +359,11 @@ class _TripDashboardState extends State<TripDashboard> {
       final parts = <String>[];
       val.forEach((k, v) {
         final label = dangerLabelForKey(k.toString());
-          if (v == true) {
-            parts.add(label);
-          } else if (v != null) {
-            parts.add('$label: ${v.toString()}');
-          }
+        if (v == true) {
+          parts.add(label);
+        } else if (v != null) {
+          parts.add('$label: ${v.toString()}');
+        }
       });
       return parts.isNotEmpty ? parts.join('\n') : 'Không có cảnh báo.';
     }
@@ -431,15 +449,15 @@ class _TripDashboardState extends State<TripDashboard> {
                                   subtitle: val != null ? Text(val.toString()) : null,
                                   trailing: pid != null
                                       ? TextButton(
-                                          onPressed: () async {
-                                            final newVal = !(ackMap[e.key] ?? false);
-                                            await _setDangerAcknowledged(pid, e.key, newVal);
-                                            setState(() {
-                                              ackMap[e.key] = newVal;
-                                            });
-                                          },
-                                          child: Text(ackMap[e.key] == true ? 'Đã xem' : 'Chưa xem', style: TextStyle(color: accent)),
-                                        )
+                                    onPressed: () async {
+                                      final newVal = !(ackMap[e.key] ?? false);
+                                      await _setDangerAcknowledged(pid, e.key, newVal);
+                                      setState(() {
+                                        ackMap[e.key] = newVal;
+                                      });
+                                    },
+                                    child: Text(ackMap[e.key] == true ? 'Đã xem' : 'Chưa xem', style: TextStyle(color: accent)),
+                                  )
                                       : null,
                                 );
                               },
@@ -557,7 +575,7 @@ class _ItemsTab extends StatelessWidget {
   final Function(String, String?) onBuyPressed;
 
   const _ItemsTab({
-    this.plan, 
+    this.plan,
     required this.equipmentDetails,
     required this.onBuyPressed,
   });
@@ -602,7 +620,7 @@ class _ItemsTab extends StatelessWidget {
               child: Row(
                 children: [
                   Container(
-                    width: 4, height: 18, 
+                    width: 4, height: 18,
                     decoration: BoxDecoration(color: kPrimaryGreen, borderRadius: BorderRadius.circular(2)),
                   ),
                   const SizedBox(width: 8),
@@ -627,7 +645,7 @@ class _ItemsTab extends StatelessWidget {
     final int quantity = item['quantity'] ?? 1;
     final String? reason = item['reason'];
     final id = item['id'].toString();
-    
+
     String? imageUrl;
     String? buyLink;
     if (equipmentDetails.containsKey(id)) {
@@ -638,7 +656,7 @@ class _ItemsTab extends StatelessWidget {
     final priceRaw = item['price'];
     String priceStr = '';
     if (priceRaw != null) {
-       priceStr = NumberFormat.currency(locale: 'vi_VN', symbol: 'đ', decimalDigits: 0).format(priceRaw);
+      priceStr = NumberFormat.currency(locale: 'vi_VN', symbol: 'đ', decimalDigits: 0).format(priceRaw);
     }
 
     return Container(
@@ -665,13 +683,13 @@ class _ItemsTab extends StatelessWidget {
                 ),
                 child: imageUrl != null && imageUrl.isNotEmpty
                     ? ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: Image.network(imageUrl, fit: BoxFit.cover),
-                      )
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.network(imageUrl, fit: BoxFit.cover, errorBuilder: (_,__,___) => const Icon(Icons.broken_image, color:Colors.grey)),
+                )
                     : const Icon(Icons.hiking, color: Colors.grey),
               ),
               const SizedBox(width: 16),
-              
+
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -689,15 +707,15 @@ class _ItemsTab extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
-                            color: Colors.grey[100],
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.grey.shade300)
+                              color: Colors.grey[100],
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.grey.shade300)
                           ),
                           child: Text("x$quantity", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                         )
                       ],
                     ),
-                    
+
                     if (priceStr.isNotEmpty) ...[
                       const SizedBox(height: 4),
                       Text(priceStr, style: const TextStyle(fontSize: 14, color: Colors.redAccent, fontWeight: FontWeight.w600)),
@@ -719,8 +737,8 @@ class _ItemsTab extends StatelessWidget {
                             const Icon(Icons.shopping_cart_outlined, size: 14, color: Colors.deepOrange),
                             const SizedBox(width: 4),
                             Text(
-                              "Mua ngay", 
-                              style: TextStyle(fontSize: 11, color: Colors.deepOrange, fontWeight: FontWeight.bold)
+                                "Mua ngay",
+                                style: TextStyle(fontSize: 11, color: Colors.deepOrange, fontWeight: FontWeight.bold)
                             ),
                           ],
                         ),
@@ -768,123 +786,433 @@ class _ItemsTab extends StatelessWidget {
   }
 }
 
-class _NotesTab extends StatelessWidget {
-  final List<String> notes;
-  final void Function(int) onDeleteNote;
-  final void Function(int) onEditNote;
-
-  const _NotesTab({required this.notes, required this.onDeleteNote, required this.onEditNote});
-
-  @override
-  Widget build(BuildContext context) {
-    if (notes.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.only(bottom: 80, left: 24, right: 24, top: 24),
-        child: Center(child: Text('Chưa có ghi chú nào. Nhấn nút + để thêm.', style: TextStyle(color: Colors.black54))),
-      );
-    }
-
-    return ListView.builder(
-      padding: const EdgeInsets.only(bottom: 80, left: 24, right: 24, top: 24),
-      itemCount: notes.length,
-      itemBuilder: (context, index) {
-        final note = notes[index];
-        return Dismissible(
-          key: ValueKey('${note}_$index'),
-          direction: DismissDirection.endToStart,
-          onDismissed: (direction) => onDeleteNote(index),
-          background: Container(
-            margin: const EdgeInsets.only(bottom: 16),
-            decoration: BoxDecoration(
-              color: Colors.red,
-              borderRadius: BorderRadius.circular(24),
-            ),
-            child: const Align(
-              alignment: Alignment.centerRight,
-              child: Padding(
-                padding: EdgeInsets.only(right: 20.0),
-                child: Icon(Icons.delete, color: Colors.white),
-              ),
-            ),
-          ),
-          child: GestureDetector(
-            onTap: () => onEditNote(index),
-            child: Container(
-              width: double.infinity,
-              margin: const EdgeInsets.only(bottom: 16),
-              padding: const EdgeInsets.all(16.0),
-              decoration: BoxDecoration(
-                color: Colors.grey[200],
-                borderRadius: BorderRadius.circular(24),
-              ),
-              child: Text(note, style: const TextStyle(fontSize: 16, color: Colors.black87)),
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _RouteTab extends StatelessWidget {
+class _RouteTab extends StatefulWidget {
   final Plan? plan;
-  final String? aiNote; // Received from Dashboard state
+  final String? aiNote;
   final bool isLoadingNote;
 
-  const _RouteTab({this.plan, this.aiNote, this.isLoadingNote = false});
+  const _RouteTab({
+    super.key,
+    this.plan,
+    this.aiNote,
+    this.isLoadingNote = false
+  });
 
   @override
-  Widget build(BuildContext context) {
-    final routes = plan?.routes ?? [];
-    if (plan == null || routes.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
+  State<_RouteTab> createState() => _RouteTabState();
+}
+
+class _RouteTabState extends State<_RouteTab> with AutomaticKeepAliveClientMixin {
+  // --- Controller & State ---
+  MapLibreMapController? map3DController;
+  final fmap.MapController map2DController = fmap.MapController();
+
+  bool _is3DMode = false;
+  bool _isMapLoading = true;
+
+  // Key MapTiler
+  final String _apiKey = "ZWKZtjZ8Q3WhJsAhQvxU";
+  String get _style3DUrl => "https://api.maptiler.com/maps/outdoor-v2/style.json?key=$_apiKey";
+
+  // Dữ liệu
+  List<LatLng> _coords3D = []; // LatLng của MapLibre
+  List<fcoords.LatLng> _coords2D = []; // LatLng của latlong2
+  List<Map<String, dynamic>> _waypointsData = [];
+  List<FlSpot> _elevationSpots = [];
+
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  void initState() {
+    super.initState();
+    _prepareData();
+  }
+
+  // 🔥 QUAN TRỌNG: Lắng nghe sự thay đổi của Plan (Khi load xong)
+  @override
+  void didUpdateWidget(covariant _RouteTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Nếu plan thay đổi (từ null -> có data), chạy lại prepareData
+    if (widget.plan?.id != oldWidget.plan?.id) {
+      _prepareData();
+    }
+  }
+
+  Future<void> _prepareData() async {
+    try {
+      final routes = widget.plan?.routes ?? [];
+      int? routeId = routes.isNotEmpty ? routes.first.id : null;
+
+      // Nếu không có Route ID (Plan null), chưa làm gì cả (chờ data)
+      if (routeId == null) {
+        if (widget.plan != null) {
+          // Plan có nhưng route rỗng -> Dùng Fake
+          _useFakeData();
+        }
+        return;
+      }
+
+      List<dynamic> rawCoords = [];
+
+      // A. Lấy tọa độ từ DB
+      final supabase = Supabase.instance.client;
+      final routeResponse = await supabase
+          .from('routes')
+          .select('path_coordinates')
+          .eq('id', routeId)
+          .maybeSingle();
+
+      if (routeResponse != null && routeResponse['path_coordinates'] != null) {
+        rawCoords = routeResponse['path_coordinates'];
+      }
+
+      // Fallback
+      if (rawCoords.isEmpty) {
+        _useFakeData();
+        return;
+      }
+
+      // B. Cập nhật State
+      if (mounted) {
+        setState(() {
+          _coords3D = rawCoords.map((c) => LatLng(c[0].toDouble(), c[1].toDouble())).toList();
+          _coords2D = rawCoords.map((c) => fcoords.LatLng(c[0].toDouble(), c[1].toDouble())).toList();
+          _isMapLoading = false;
+        });
+
+        _generateSimulatedElevation(
+            widget.plan?.routes.firstOrNull?.distanceKm ?? 10,
+            widget.plan?.routes.firstOrNull?.elevationGainM ?? 1600
+        );
+      }
+
+      // C. Lấy Waypoints
+      final wptResponse = await supabase
+          .from('route_waypoints')
+          .select('*')
+          .eq('route_id', routeId);
+
+      if (mounted && wptResponse != null) {
+        setState(() {
+          _waypointsData = List<Map<String, dynamic>>.from(wptResponse);
+        });
+      }
+    } catch (e) {
+      debugPrint("🔴 Lỗi _prepareData: $e");
+      if (mounted) setState(() => _isMapLoading = false);
+    }
+  }
+
+  void _useFakeData() {
+    final fake = [
+      [22.335, 103.840], [22.338, 103.842], [22.342, 103.845],
+      [22.345, 103.848], [22.340, 103.855], [22.330, 103.860],
+    ];
+    setState(() {
+      _coords3D = fake.map((c) => LatLng(c[0], c[1])).toList();
+      _coords2D = fake.map((c) => fcoords.LatLng(c[0], c[1])).toList();
+      _isMapLoading = false;
+    });
+  }
+
+  // --- 2. CẤU HÌNH MAP 3D (MapLibre) ---
+  void _onMap3DCreated(MapLibreMapController controller) {
+    map3DController = controller;
+  }
+
+  Future<void> _onStyle3DLoaded() async {
+    if (map3DController == null || _coords3D.isEmpty) return;
+
+    // Vẽ đường đỏ
+    await map3DController!.addLine(LineOptions(
+      geometry: _coords3D,
+      lineColor: "#ff0000",
+      lineWidth: 4.0,
+      lineOpacity: 0.9,
+    ));
+
+    // Camera animate
+    await map3DController!.animateCamera(CameraUpdate.newLatLngBounds(
+        _bounds3D(_coords3D), left: 50, right: 50, top: 50, bottom: 50
+    ));
+
+    // Tilt hiệu ứng 3D
+    await Future.delayed(const Duration(milliseconds: 500));
+    await map3DController!.animateCamera(CameraUpdate.tiltTo(60.0));
+
+    // Thêm các marker 3D
+    await _add3DMarkers();
+  }
+
+  Future<void> _add3DMarkers() async {
+    await map3DController!.addImage("icon-summit", await _createMarkerImage(Icons.terrain, Colors.brown));
+    await map3DController!.addImage("icon-water", await _createMarkerImage(Icons.water_drop, Colors.blue));
+    await map3DController!.addImage("icon-danger", await _createMarkerImage(Icons.warning_rounded, Colors.red));
+    await map3DController!.addImage("icon-camp", await _createMarkerImage(Icons.night_shelter, Colors.green));
+
+    // Start/End icons 3D
+    await map3DController!.addImage("icon-start", await _createMarkerImage(Icons.circle, Colors.greenAccent));
+    await map3DController!.addImage("icon-end", await _createMarkerImage(Icons.flag, Colors.redAccent));
+
+    for (var wpt in _waypointsData) {
+      String iconName = "icon-summit";
+      if (wpt['type'] == 'water') iconName = "icon-water";
+      if (wpt['type'] == 'danger') iconName = "icon-danger";
+      if (wpt['type'] == 'campsite') iconName = "icon-camp";
+
+      await map3DController!.addSymbol(SymbolOptions(
+        geometry: LatLng(wpt['latitude'], wpt['longitude']),
+        iconImage: iconName, iconSize: 0.5,
+        textField: wpt['name'], textOffset: const Offset(0, 1.8),
+        textSize: 12.0, textHaloColor: "#ffffff", textHaloWidth: 1.5,
+      ));
+    }
+
+    if (_coords3D.isNotEmpty) {
+      await map3DController!.addSymbol(SymbolOptions(
+        geometry: _coords3D.first, iconImage: "icon-start", iconSize: 0.6,
+        textField: "START", textOffset: const Offset(0, 1.5), textColor: "#00AA00", textHaloColor: "#ffffff", textHaloWidth: 2.0,
+      ));
+      await map3DController!.addSymbol(SymbolOptions(
+        geometry: _coords3D.last, iconImage: "icon-end", iconSize: 0.6,
+        textField: "END", textOffset: const Offset(0, 1.5), textColor: "#FF0000", textHaloColor: "#ffffff", textHaloWidth: 2.0,
+      ));
+    }
+  }
+
+  LatLngBounds _bounds3D(List<LatLng> list) {
+    double? minLat, maxLat, minLng, maxLng;
+    for (final latLng in list) {
+      minLat = (minLat == null) ? latLng.latitude : min(minLat, latLng.latitude);
+      maxLat = (maxLat == null) ? latLng.latitude : max(maxLat, latLng.latitude);
+      minLng = (minLng == null) ? latLng.longitude : min(minLng, latLng.longitude);
+      maxLng = (maxLng == null) ? latLng.longitude : max(maxLng, latLng.longitude);
+    }
+    return LatLngBounds(southwest: LatLng(minLat!, minLng!), northeast: LatLng(maxLat!, maxLng!));
+  }
+
+  Future<Uint8List> _createMarkerImage(IconData iconData, Color bgColor) async {
+    final ui.PictureRecorder pictureRecorder = ui.PictureRecorder();
+    final Canvas canvas = Canvas(pictureRecorder);
+    const int size = 100; final double radius = size / 2;
+
+    final Paint shadowPaint = Paint()..color = Colors.black.withOpacity(0.4)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5.0);
+    canvas.drawCircle(Offset(radius, radius + 3), radius, shadowPaint);
+
+    final Paint borderPaint = Paint()..color = Colors.white;
+    canvas.drawCircle(Offset(radius, radius), radius, borderPaint);
+
+    final Paint bgPaint = Paint()..color = bgColor;
+    canvas.drawCircle(Offset(radius, radius), radius - 6, bgPaint);
+
+    final TextPainter textPainter = TextPainter(textDirection: ui.TextDirection.ltr);
+    textPainter.text = TextSpan(
+      text: String.fromCharCode(iconData.codePoint),
+      style: TextStyle(fontSize: size * 0.55, fontFamily: iconData.fontFamily, color: Colors.white, fontWeight: FontWeight.bold),
+    );
+    textPainter.layout();
+    textPainter.paint(canvas, Offset(radius - textPainter.width / 2, radius - textPainter.height / 2));
+    final ui.Image image = await pictureRecorder.endRecording().toImage(size, size);
+    final ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+    return byteData!.buffer.asUint8List();
+  }
+
+  // --- 3. CẤU HÌNH MAP 2D (Flutter Map - ESRI - Giao diện Interactive) ---
+
+  Widget _build2DLabelMarker(String label, IconData icon, Color color) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [const BoxShadow(color: Colors.black26, blurRadius: 4)],
+            border: Border.all(color: color, width: 2),
+          ),
+          child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.map_outlined, size: 48, color: Colors.grey),
-              const SizedBox(height: 12),
-              const Text(
-                'Không tìm thấy thông tin lộ trình.\nCó thể bạn chưa chọn lộ trình cho kế hoạch này.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.black54),
-              ),
+              Icon(icon, size: 14, color: color),
+              const SizedBox(width: 4),
+              Text(label, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 12)),
             ],
           ),
         ),
-      );
-    }
+        Icon(Icons.arrow_drop_down, color: color, size: 24),
+      ],
+    );
+  }
 
+  Widget _build2DDetailMarker(Map<String, dynamic> wpt) {
+    Color color = Colors.blue;
+    IconData icon = Icons.place;
+
+    if (wpt['type'] == 'summit') { color = Colors.brown; icon = Icons.terrain; }
+    if (wpt['type'] == 'danger') { color = Colors.red; icon = Icons.warning_rounded; }
+    if (wpt['type'] == 'campsite') { color = Colors.green[700]!; icon = Icons.night_shelter; }
+
+    return GestureDetector(
+      onTap: () {},
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.9),
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(color: Colors.grey[300]!),
+            ),
+            child: Text(
+              wpt['name'],
+              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+              maxLines: 1, overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white, width: 2),
+              boxShadow: [const BoxShadow(color: Colors.black38, blurRadius: 3, offset: Offset(0, 2))],
+            ),
+            child: Icon(icon, color: Colors.white, size: 16),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMap2D() {
+    if (_coords2D.isEmpty) return const Center(child: Text("Không có dữ liệu bản đồ"));
+
+    return fmap.FlutterMap(
+      mapController: map2DController,
+      options: fmap.MapOptions(
+          initialCameraFit: fmap.CameraFit.bounds(
+            bounds: fmap.LatLngBounds.fromPoints(_coords2D),
+            padding: const EdgeInsets.all(40),
+          ),
+          // 🔥 QUAN TRỌNG: Chỉ Zoom khi Map đã sẵn sàng
+          onMapReady: () {
+            if (_coords2D.isNotEmpty) {
+              map2DController.fitCamera(
+                fmap.CameraFit.bounds(
+                  bounds: fmap.LatLngBounds.fromPoints(_coords2D),
+                  padding: const EdgeInsets.all(40),
+                ),
+              );
+            }
+          }
+      ),
+      children: [
+        fmap.TileLayer(
+          // ESRI WORLD TOPO LAYER (Giao diện chuẩn Interactive Map)
+          urlTemplate: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',
+          userAgentPackageName: 'com.trekking.app',
+        ),
+        fmap.PolylineLayer(
+          polylines: [
+            fmap.Polyline(points: _coords2D, color: Colors.redAccent, strokeWidth: 4.0),
+          ],
+        ),
+        fmap.MarkerLayer(
+          markers: [
+            fmap.Marker(
+              point: _coords2D.first,
+              width: 100, height: 60,
+              child: _build2DLabelMarker("START", Icons.circle, Colors.green),
+            ),
+            fmap.Marker(
+              point: _coords2D.last,
+              width: 100, height: 60,
+              child: _build2DLabelMarker("END", Icons.flag, Colors.red),
+            ),
+            ..._waypointsData.map((wpt) {
+              return fmap.Marker(
+                point: fcoords.LatLng(wpt['latitude'], wpt['longitude']),
+                width: 120, height: 80,
+                child: _build2DDetailMarker(wpt),
+              );
+            }),
+          ],
+        ),
+      ],
+    );
+  }
+
+  void _generateSimulatedElevation(double distKm, int gainM) {
+    final points = 50; final random = Random(); List<FlSpot> spots = [];
+    double currentElevation = 500; double maxGain = gainM.toDouble();
+    for (int i = 0; i < points; i++) {
+      double change = (random.nextDouble() - 0.45) * (maxGain / 8);
+      currentElevation += change; if (currentElevation < 0) currentElevation = 0;
+      double distance = (distKm / points) * i;
+      spots.add(FlSpot(distance, currentElevation));
+    }
+    setState(() {
+      _elevationSpots = spots;
+    });
+  }
+
+  // --- UI CHÍNH ---
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+
+    final routes = widget.plan?.routes ?? [];
+    if (widget.plan == null || routes.isEmpty) {
+      // Khi đang load data hoặc plan lỗi
+      return const Center(child: CircularProgressIndicator());
+    }
     final r = routes.first;
 
     return ListView(
       padding: const EdgeInsets.only(bottom: 80),
       children: [
-        // 1. Map / Image Placeholder
-        Container(
-          height: 250,
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: Colors.grey[300],
-            image: r.imageUrl != null && r.imageUrl!.isNotEmpty
-                ? DecorationImage(
-                    image: NetworkImage(r.imageUrl!),
-                    fit: BoxFit.cover,
-                  )
-                : null,
-          ),
+        SizedBox(
+          height: 400,
           child: Stack(
             children: [
-              if (r.imageUrl == null || r.imageUrl!.isEmpty)
-                const Center(child: Icon(Icons.terrain, size: 64, color: Colors.white54)),
-              
-              // 🟢 7. Repositioned Buttons (Top Corners)
-              
-              // Customize Button (Top Left)
+              if (_isMapLoading)
+                const Center(child: CircularProgressIndicator())
+              else if (_is3DMode)
+                MapLibreMap(
+                  styleString: _style3DUrl,
+                  onMapCreated: _onMap3DCreated,
+                  onStyleLoadedCallback: _onStyle3DLoaded,
+                  initialCameraPosition: const CameraPosition(target: LatLng(21.0, 105.8), zoom: 10.0),
+                  rotateGesturesEnabled: true, tiltGesturesEnabled: true,
+                )
+              else
+                _buildMap2D(),
+
+              // Nút Toggle 2D/3D Style đen
               Positioned(
-                top: 16,
-                left: 16,
+                top: 16, right: 16,
+                child: GestureDetector(
+                  onTap: () => setState(() => _is3DMode = !_is3DMode),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.black87, borderRadius: BorderRadius.circular(30),
+                      boxShadow: [const BoxShadow(color: Colors.black26, blurRadius: 4)],
+                    ),
+                    child: Row(children: [
+                      Icon(_is3DMode ? Icons.map : Icons.view_in_ar, size: 18, color: Colors.white),
+                      const SizedBox(width: 8),
+                      Text(_is3DMode ? "2D" : "3D", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.white)),
+                    ]),
+                  ),
+                ),
+              ),
+
+              // Nút Tùy chỉnh (Giữ nguyên vị trí nhưng update style đen)
+              Positioned(
+                top: 16, left: 16,
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                   decoration: BoxDecoration(
@@ -901,27 +1229,11 @@ class _RouteTab extends StatelessWidget {
                   ),
                 ),
               ),
-              
-              // 3D Button (Top Right)
-              Positioned(
-                top: 16,
-                right: 16,
-                child: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.9),
-                    shape: BoxShape.circle,
-                    boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 4)],
-                  ),
-                  child: const Icon(Icons.layers_outlined, color: Colors.black87),
-                ),
-              )
             ],
           ),
         ),
 
-        // 2. Info Section
+        // 2. INFO SECTION
         Container(
           transform: Matrix4.translationValues(0, -20, 0),
           decoration: const BoxDecoration(
@@ -937,19 +1249,46 @@ class _RouteTab extends StatelessWidget {
                 style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, height: 1.2),
               ),
               const SizedBox(height: 8),
-              
+
               Text(
                 '${r.distanceKm ?? 0} km • ${r.elevationGainM ?? 0} m gain • Est. ${r.durationDays ?? 1} days',
                 style: TextStyle(fontSize: 16, color: Colors.grey[700], fontWeight: FontWeight.w500),
               ),
               const SizedBox(height: 24),
 
-              // Elevation Chart Placeholder
-              Container(
-                height: 100,
+              const Text("Biểu đồ độ cao", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.grey)),
+              const SizedBox(height: 12),
+              SizedBox(
+                height: 150,
                 width: double.infinity,
-                child: CustomPaint(
-                  painter: _ChartPainter(),
+                child: LineChart(
+                  LineChartData(
+                    gridData: const FlGridData(show: false),
+                    titlesData: const FlTitlesData(show: false),
+                    borderData: FlBorderData(show: false),
+                    lineTouchData: LineTouchData(
+                        touchTooltipData: LineTouchTooltipData(
+                          getTooltipItems: (spots) => spots.map((s) => LineTooltipItem('${s.y.toInt()}m', const TextStyle(color: Colors.white))).toList(),
+                        )
+                    ),
+                    lineBarsData: [
+                      LineChartBarData(
+                        spots: _elevationSpots.isNotEmpty ? _elevationSpots : [const FlSpot(0,0), const FlSpot(1,0)],
+                        isCurved: true,
+                        color: Colors.black87,
+                        barWidth: 2,
+                        dotData: const FlDotData(show: false),
+                        belowBarData: BarAreaData(
+                          show: true,
+                          gradient: LinearGradient(
+                            colors: [kPrimaryGreen.withOpacity(0.3), Colors.white],
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(height: 8),
@@ -957,14 +1296,12 @@ class _RouteTab extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text("0.0 km", style: TextStyle(fontSize: 10, color: Colors.grey)),
-                  const Text("5.0 km", style: TextStyle(fontSize: 10, color: Colors.grey)),
                   Text("${r.distanceKm ?? 10} km", style: const TextStyle(fontSize: 10, color: Colors.grey)),
                 ],
               ),
 
               const SizedBox(height: 24),
 
-              // 🟢 8. AI Note Section
               Row(
                 children: [
                   const Icon(Icons.auto_awesome, size: 20, color: Colors.purple),
@@ -973,10 +1310,10 @@ class _RouteTab extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 12),
-              
-              if (isLoadingNote)
+
+              if (widget.isLoadingNote)
                 const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator()))
-              else 
+              else
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(16),
@@ -986,7 +1323,7 @@ class _RouteTab extends StatelessWidget {
                     border: Border.all(color: Colors.purple.withOpacity(0.1)),
                   ),
                   child: Text(
-                    aiNote ?? "Không có thông tin bổ sung.",
+                    widget.aiNote ?? "Không có thông tin bổ sung.",
                     style: const TextStyle(fontSize: 15, height: 1.6, color: Colors.black87),
                   ),
                 ),
@@ -996,38 +1333,6 @@ class _RouteTab extends StatelessWidget {
       ],
     );
   }
-}
-
-class _ChartPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.black87
-      ..strokeWidth = 2
-      ..style = PaintingStyle.stroke;
-
-    final path = Path();
-    path.moveTo(0, size.height * 0.8);
-    path.quadraticBezierTo(size.width * 0.2, size.height * 0.7, size.width * 0.4, size.height * 0.5);
-    path.quadraticBezierTo(size.width * 0.6, size.height * 0.8, size.width * 0.8, size.height * 0.4);
-    path.quadraticBezierTo(size.width * 0.9, size.height * 0.6, size.width, size.height * 0.3);
-
-    canvas.drawPath(path, paint);
-    
-    final fillPath = Path.from(path);
-    fillPath.lineTo(size.width, size.height);
-    fillPath.lineTo(0, size.height);
-    fillPath.close();
-    
-    final fillPaint = Paint()
-      ..color = Colors.grey.withOpacity(0.1)
-      ..style = PaintingStyle.fill;
-      
-    canvas.drawPath(fillPath, fillPaint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _NoteEditorScreen extends StatefulWidget {
@@ -1074,6 +1379,84 @@ class _NoteEditorScreenState extends State<_NoteEditorScreen> {
           ])
         ]),
       ),
+    );
+  }
+}
+
+class _NotesTab extends StatelessWidget {
+  final List<String> notes;
+  final void Function(int) onDeleteNote;
+  final void Function(int) onEditNote;
+
+  const _NotesTab({
+    required this.notes,
+    required this.onDeleteNote,
+    required this.onEditNote
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (notes.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: const [
+              Icon(Icons.note_add_outlined, size: 64, color: Colors.black12),
+              SizedBox(height: 12),
+              Text(
+                'Chưa có ghi chú nào.\nNhấn nút + để thêm.',
+                style: TextStyle(fontSize: 16, color: Colors.black54),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.only(bottom: 80, left: 16, right: 16, top: 16),
+      itemCount: notes.length,
+      itemBuilder: (context, index) {
+        final note = notes[index];
+        return Dismissible(
+          key: ValueKey('${note}_$index'),
+          direction: DismissDirection.endToStart,
+          onDismissed: (direction) => onDeleteNote(index),
+          background: Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: Colors.red,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            alignment: Alignment.centerRight,
+            padding: const EdgeInsets.only(right: 20),
+            child: const Icon(Icons.delete, color: Colors.white),
+          ),
+          child: GestureDetector(
+            onTap: () => onEditNote(index),
+            child: Container(
+              width: double.infinity,
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(16.0),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  )
+                ],
+              ),
+              child: Text(note, style: const TextStyle(fontSize: 15, color: Colors.black87)),
+            ),
+          ),
+        );
+      },
     );
   }
 }

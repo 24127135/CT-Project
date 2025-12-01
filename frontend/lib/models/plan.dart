@@ -126,8 +126,10 @@ class Plan {
     }
 
     List<RouteModel> parsedRoutes = [];
-    final routesRaw = data['routes']; 
-    
+    final routesRaw = data['routes'];
+    print("📢 DEBUG PLAN ID: ${data['id']}");
+    print("📢 ROUTES RAW TYPE: ${routesRaw.runtimeType}");
+    print("📢 ROUTES RAW DATA: $routesRaw");
     if (routesRaw != null) {
       if (routesRaw is List) {
         // Standard list
