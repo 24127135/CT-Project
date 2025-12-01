@@ -203,7 +203,7 @@ class _LocationInput extends StatelessWidget {
           focusNode: focusNode,
           onChanged: (value) => context.read<TripProvider>().setSearchLocation(value),
           decoration: InputDecoration(
-            hintText: 'Search (VD: Bình Định...)',
+            hintText: 'Search (VD: Lai Châu...)',
             prefixIcon: const Icon(Icons.search, color: Colors.black54),
             border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12.0)), borderSide: BorderSide.none),
             filled: true,
