@@ -2,7 +2,7 @@
 import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart' show debugPrint;
-// Supabase import removed — session lifecycle no longer signs out automatically.
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class SessionLifecycleService {
   static const String _keyLastPid = 'last_known_pid';
@@ -20,9 +20,14 @@ class SessionLifecycleService {
 
     // Logic kiểm tra
     if (lastPid != null && lastPid != currentPid) {
-      debugPrint("--- [SessionLifecycle] => PHÁT HIỆN COLD START (PID đổi từ $lastPid sang $currentPid). Will NOT sign out to preserve client session.");
-      // Previously we would sign out here which removed user sessions on cold starts.
-      // To preserve user login across abrupt app closes, we avoid calling signOut automatically.
+      debugPrint("--- [SessionLifecycle] => PHÁT HIỆN COLD START (PID đổi từ $lastPid sang $currentPid). Signing out to enforce logout on cold start.");
+      // On cold start, clear Supabase session so users are logged out.
+      try {
+        await Supabase.instance.client.auth.signOut();
+        debugPrint('--- [SessionLifecycle] Supabase signOut() completed.');
+      } catch (e) {
+        debugPrint('--- [SessionLifecycle] Supabase signOut() failed: ${e.toString()}');
+      }
       isColdStart = true;
     } else {
       debugPrint("--- [SessionLifecycle] => Hot Restart hoặc lần đầu chạy (PID $currentPid). Giữ nguyên.");
