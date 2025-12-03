@@ -3,6 +3,7 @@ import '../models/trip_template.dart';
 import '../services/supabase_db_service.dart';
 import '../services/gemini_service.dart';
 import '../features/preference_matching/models/route_model.dart';
+import '../utils/logger.dart';
 
 class TripProvider with ChangeNotifier {
 
@@ -96,9 +97,13 @@ class TripProvider with ChangeNotifier {
 
     final gs = data['group_size'] ?? data['payload']?['group_size'];
     if (gs is int) {
-      if (gs >= 7) _paxGroup = 'Nhóm đông (7+ người)';
-      else if (gs >= 3) _paxGroup = 'Nhóm nhỏ (3-6 người)';
-      else _paxGroup = 'Đơn lẻ (1-2 người)';
+      if (gs >= 7) {
+        _paxGroup = 'Nhóm đông (7+ người)';
+      } else if (gs >= 3) {
+        _paxGroup = 'Nhóm nhỏ (3-6 người)';
+      } else {
+        _paxGroup = 'Đơn lẻ (1-2 người)';
+      }
     } else if (gs is String) {
       _paxGroup = gs;
     }
@@ -146,15 +151,14 @@ class TripProvider with ChangeNotifier {
       // 🟢 STORE THE ID for later use
       if (response['id'] != null) {
         _currentPlanId = response['id'];
-        debugPrint("✅ Draft Plan Saved. ID: $_currentPlanId");
+        AppLogger.d('TripProvider', 'Draft Plan saved. ID: $_currentPlanId');
       }
 
     } catch (e) {
-      debugPrint("❌ Error saving trip request: $e");
+      AppLogger.e('TripProvider', 'Error saving trip request: ${e.toString()}');
       rethrow;
     }
   }
-
   // --- CONFIRM ROUTE & AI CHECKLIST (Step 6) ---
   // Updated to accept the AI generated checklist
   Future<void> confirmRouteForPlan(int routeId, {Map<String, dynamic>? checklist}) async {
@@ -162,9 +166,8 @@ class TripProvider with ChangeNotifier {
       if (_currentPlanId == null) {
         throw Exception("Lỗi: Không tìm thấy ID chuyến đi. Vui lòng tạo lại.");
       }
-
-      debugPrint("🔄 Updating Plan $_currentPlanId with Route $routeId and Checklist...");
-
+      AppLogger.d('TripProvider', 'Plan updated with Route ID $routeId');
+      
       // Call Update Method on Supabase Service
       // Ensure your SupabaseDbService.updatePlanRoute is updated to accept the checklist parameter!
       await _supabaseDb.updatePlanRoute(
@@ -173,14 +176,12 @@ class TripProvider with ChangeNotifier {
         checklist: checklist // Pass the AI checklist here
       );
 
-      debugPrint("✅ Plan updated with Route ID & Equipment. Ready for PEC.");
       
     } catch (e) {
-      debugPrint("❌ Error confirming route: $e");
+      AppLogger.e('TripProvider', 'Error confirming route: ${e.toString()}');
       rethrow;
     }
   }
-
   Future<void> saveHistoryInput(String name) async {
     if (_searchLocation.isEmpty || _accommodation == null || _paxGroup == null || _difficultyLevel == null) {
       throw Exception("Vui lòng điền đầy đủ thông tin trước khi lưu.");
@@ -221,13 +222,13 @@ class TripProvider with ChangeNotifier {
         personalInterests: _selectedInterests,
       );
 
-      debugPrint("✅ Đã tạo Plan thành công cho route: ${selectedRoute.name}");
+      
 
       // Không reset vội, để người dùng còn thấy data nếu cần
       // resetTrip();
 
     } catch (e) {
-      debugPrint("❌ Lỗi Provider createPlan: $e");
+      AppLogger.e('TripProvider', 'Lỗi Provider createPlan: ${e.toString()}');
       rethrow;
     }
   }
@@ -236,8 +237,7 @@ class TripProvider with ChangeNotifier {
   // Đã chuyển sang gọi Supabase trực tiếp
   Future<List<RouteModel>> fetchSuggestedRoutes() async {
     try {
-      debugPrint("1️⃣ Bắt đầu quy trình gợi ý thông minh...");
-
+      
       // Bước A: Lấy dữ liệu thô từ Supabase (Lọc sơ bộ)
       final rawData = await _supabaseDb.getSuggestedRoutes(
         location: _searchLocation, // Lọc theo địa điểm user nhập
@@ -251,13 +251,12 @@ class TripProvider with ChangeNotifier {
 
       // Nếu Supabase không tìm thấy gì, trả về rỗng luôn
       if (initialRoutes.isEmpty) {
-        debugPrint("⚠️ Supabase không tìm thấy cung đường nào khớp bộ lọc cơ bản.");
+        AppLogger.d('TripProvider', 'No initial routes found');
         return [];
       }
 
       // Bước B: Gửi cho AI phân tích (Tinh chỉnh & Viết lời khuyên)
-      debugPrint("2️⃣ Gửi ${initialRoutes.length} cung đường cho Gemini...");
-
+      
       final aiRoutes = await _geminiService.recommendRoutes(
         allRoutes: initialRoutes,
         userLocation: _searchLocation,
@@ -270,7 +269,7 @@ class TripProvider with ChangeNotifier {
       return aiRoutes;
 
     } catch (e) {
-      debugPrint("❌ Lỗi Provider: $e");
+      AppLogger.e('TripProvider', 'Error fetching suggested routes: ${e.toString()}');
       return [];
     }
   }

@@ -14,12 +14,12 @@ import 'package:provider/provider.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:frontend/features/preference_matching/models/route_model.dart';
-import 'package:frontend/utils/app_colors.dart';
-import 'package:frontend/utils/app_styles.dart';
+// app_colors and app_styles were unused here; imports removed during analyzer cleanup
 import 'package:frontend/widgets/custom_button.dart';
 import 'package:frontend/providers/trip_provider.dart';
-import 'package:frontend/screens/PEC.dart';
+import 'package:frontend/screens/pec.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:frontend/utils/notification.dart';
 
 class InteractiveMapPage extends StatefulWidget {
   final RouteModel route;
@@ -268,7 +268,7 @@ class _InteractiveMapPageState extends State<InteractiveMapPage> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.9),
+              color: Colors.white.withAlpha(230),
               borderRadius: BorderRadius.circular(4),
               border: Border.all(color: Colors.grey[300]!),
             ),
@@ -306,7 +306,7 @@ class _InteractiveMapPageState extends State<InteractiveMapPage> {
     final ui.PictureRecorder pictureRecorder = ui.PictureRecorder();
     final Canvas canvas = Canvas(pictureRecorder);
     const int size = 100; final double radius = size / 2;
-    final Paint shadowPaint = Paint()..color = Colors.black.withOpacity(0.4)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5.0);
+    final Paint shadowPaint = Paint()..color = Colors.black.withAlpha(102)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5.0);
     canvas.drawCircle(Offset(radius, radius + 3), radius, shadowPaint);
     final Paint borderPaint = Paint()..color = Colors.white;
     canvas.drawCircle(Offset(radius, radius), radius, borderPaint);
@@ -351,6 +351,8 @@ class _InteractiveMapPageState extends State<InteractiveMapPage> {
   // --- LOGIC XÁC NHẬN: BẬT LẠI GEMINI CHECKLIST ---
   Future<void> _confirmRoute(BuildContext context) async {
     setState(() => _isLoading = true);
+    final BuildContext ctx = context;
+    final navigator = Navigator.of(ctx);
     try {
       final tripProvider = Provider.of<TripProvider>(context, listen: false);
       final supabase = Supabase.instance.client;
@@ -379,7 +381,8 @@ class _InteractiveMapPageState extends State<InteractiveMapPage> {
           allEquipment: equipmentList,
         );
       } catch (aiError) {
-        debugPrint("⚠️ Lỗi Gemini: $aiError");
+        // Inform user but continue with empty checklist
+        if (mounted) NotificationService.showInfo('AI checklist không khả dụng, tiếp tục lưu mặc định.');
       }
 
       // 4. Lưu vào Database
@@ -389,11 +392,13 @@ class _InteractiveMapPageState extends State<InteractiveMapPage> {
       );
 
       if (!mounted) return;
-      Navigator.push(context, MaterialPageRoute(builder: (_) => const PECScreen()));
+      // Notify user then navigate
+      NotificationService.showSuccess('Đã cập nhật chuyến đi. Chuẩn bị PEC...');
+      navigator.push(MaterialPageRoute(builder: (_) => const PECScreen()));
 
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Lỗi: $e'), backgroundColor: Colors.red));
+      NotificationService.showError('Lỗi: $e');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -491,7 +496,7 @@ class _InteractiveMapPageState extends State<InteractiveMapPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Center(child: Container(width: 40, height: 4, color: Colors.grey[300], margin: const EdgeInsets.symmetric(vertical: 10))),
-                      Text('${widget.route.name}', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                      Text(widget.route.name, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 4),
                       Text('${widget.route.distanceKm} km • ${widget.route.elevationGainM}m gain • ${widget.route.durationDays} days', style: const TextStyle(color: Colors.grey, fontSize: 14)),
                       const SizedBox(height: 20),

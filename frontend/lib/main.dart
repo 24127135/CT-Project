@@ -9,6 +9,7 @@ import 'core/supabase_config.dart';
 import 'services/session_lifecycle_service.dart';
 
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'utils/notification.dart';
 
 Future<void> main() async {
   // load API key first
@@ -47,7 +48,7 @@ class MyApp extends StatelessWidget {
     // 1. Lấy session hiện tại (có thể vẫn còn cache trong RAM dù đã signOut)
     final session = Supabase.instance.client.auth.currentSession;
 
-    debugPrint("--- [MyApp Check] ColdStart: $isColdStart | Session: ${session != null ? 'Có' : 'Không'} ---");
+    
 
     // 2. LOGIC QUYẾT ĐỊNH MÀN HÌNH KHỞI ĐỘNG (QUAN TRỌNG)
     Widget startScreen;
@@ -64,6 +65,8 @@ class MyApp extends StatelessWidget {
     }
 
     return MaterialApp(
+      scaffoldMessengerKey: NotificationService.messengerKey,
+      navigatorKey: NotificationService.navigatorKey,
       title: 'Trek Guide',
       debugShowCheckedModeBanner: false,
       routes: {

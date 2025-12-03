@@ -4,8 +4,6 @@ import 'package:provider/provider.dart';
 import '../../providers/trip_provider.dart';
 import '../features/preference_matching/models/route_model.dart';
 import '../features/preference_matching/screen/preference_matching_page.dart';
-import '../services/gemini_service.dart';
-
 class WaitingScreen extends StatefulWidget {
   const WaitingScreen({super.key});
 

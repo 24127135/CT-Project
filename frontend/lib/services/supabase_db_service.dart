@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'danger_labels.dart'; // Ensure this file exists from the 'tri' branch
+import '../utils/logger.dart';
 
 class SupabaseDbService {
   final _client = Supabase.instance.client;
@@ -50,7 +51,7 @@ class SupabaseDbService {
 
       return routes;
     } catch (e) {
-      print("❌ Lỗi Logic: $e");
+      AppLogger.e('SupabaseDb', 'Lỗi Logic in getSuggestedRoutes: ${e.toString()}');
       return [];
     }
   }
@@ -127,7 +128,7 @@ class SupabaseDbService {
     final uid = _uid;
     if (uid == null) throw Exception('Not signed in');
 
-    print("🔄 Sending PATCH update to Supabase for Plan ID: $planId with Route ID: $routeId");
+    AppLogger.d('SupabaseDb', 'Sending PATCH update to Supabase for Plan ID: $planId with Route ID: $routeId');
 
     final Map<String, dynamic> updates = {
       'route_id': routeId,

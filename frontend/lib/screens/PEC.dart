@@ -1,3 +1,5 @@
+// PEC content (lowercase file). This file contains the PEC screen implementation.
+// ignore_for_file: unused_element_parameter, unnecessary_underscores, file_names
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -411,7 +413,7 @@ class _PECContentState extends State<PECContent> {
         padding: const EdgeInsets.symmetric(horizontal: 16),
         scrollDirection: Axis.horizontal,
         itemCount: _categories.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 10),
+        separatorBuilder: (context, _) => const SizedBox(width: 10),
         itemBuilder: (context, index) {
           final isSelected = index == _currentCategoryIndex;
           return GestureDetector(
@@ -478,7 +480,7 @@ class _PECContentState extends State<PECContent> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? _primaryGreen.withOpacity(0.1) : Colors.transparent,
+          color: isSelected ? _primaryGreen.withAlpha(26) : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: isSelected ? _primaryGreen : Colors.grey.shade300),
         ),
@@ -526,9 +528,9 @@ class _PECContentState extends State<PECContent> {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.orange.withOpacity(0.5), width: 1.5),
+            border: Border.all(color: Colors.orange.withAlpha(128), width: 1.5),
             boxShadow: [
-              BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 8, offset: const Offset(0, 2))
+              BoxShadow(color: Colors.black.withAlpha(8), blurRadius: 8, offset: const Offset(0, 2))
             ],
           ),
           child: Column(
@@ -615,9 +617,9 @@ class _PECContentState extends State<PECContent> {
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                           decoration: BoxDecoration(
-                            color: Colors.orange.withOpacity(0.1),
+                            color: Colors.orange.withAlpha(26),
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.orange.withOpacity(0.5)),
+                            border: Border.all(color: Colors.orange.withAlpha(128)),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -645,7 +647,7 @@ class _PECContentState extends State<PECContent> {
                   margin: const EdgeInsets.only(top: 8, left: 8),
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.orange.withOpacity(0.08),
+                    color: Colors.orange.withAlpha(20),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
@@ -676,7 +678,7 @@ class _PECContentState extends State<PECContent> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 16, offset: const Offset(0, -4))],
+        boxShadow: [BoxShadow(color: Colors.black.withAlpha(20), blurRadius: 16, offset: const Offset(0, -4))],
       ),
       child: Row(
         children: [

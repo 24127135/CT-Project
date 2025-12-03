@@ -1,3 +1,4 @@
+// ignore_for_file: unused_element_parameter
 import 'dart:convert';
 
 import 'dart:math';
@@ -13,6 +14,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:http/http.dart' as http;
 
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import '../utils/logger.dart';
 
 // --- CÁC SERVICE CỦA BẠN ---
 import '../services/supabase_db_service.dart';
@@ -80,7 +82,7 @@ class _TripDashboardState extends State<TripDashboard> {
         throw 'Could not launch $url';
       }
     } catch (e) {
-      debugPrint("Error launching URL: $e");
+      AppLogger.e('TripDashboard', 'Error launching URL: ${e.toString()}');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Không thể mở liên kết mua hàng")),
@@ -121,7 +123,7 @@ class _TripDashboardState extends State<TripDashboard> {
         });
       }
     } catch (e) {
-      debugPrint("Error fetching equipment details: $e");
+      AppLogger.e('TripDashboard', 'Error fetching equipment details: ${e.toString()}');
     }
   }
 
@@ -129,16 +131,15 @@ class _TripDashboardState extends State<TripDashboard> {
     if (plan.routes.isEmpty) return;
 
     final route = plan.routes.first;
-    if (route.name == null) return;
 
     setState(() => _isLoadingNote = true);
 
-    final raw = await _geminiService.generateRouteNote(
-        route.name!,
+      final raw = await _geminiService.generateRouteNote(
+        route.name ?? '',
         plan.location
-    );
+      );
 
-    String display = raw ?? '';
+    String display = raw;
     // Defensive: AI service may return structured JSON (e.g. { "note": "..." })
     try {
       if (display.trim().startsWith('{') || display.trim().startsWith('[')) {
@@ -153,8 +154,11 @@ class _TripDashboardState extends State<TripDashboard> {
           } else {
             // Try to find first string value
             final firstStr = decoded.values.firstWhere((v) => v is String, orElse: () => null);
-            if (firstStr is String) display = firstStr;
-            else display = decoded.toString();
+            if (firstStr is String) {
+              display = firstStr;
+            } else {
+              display = decoded.toString();
+            }
           }
         } else if (decoded is List && decoded.isNotEmpty) {
           // join list items into readable text
@@ -163,7 +167,7 @@ class _TripDashboardState extends State<TripDashboard> {
       }
     } catch (e) {
       // ignore JSON parse errors and use raw string
-      debugPrint('AI note parse error: $e');
+      AppLogger.e('TripDashboard', 'AI note parse error: ${e.toString()}');
     }
 
     if (mounted) {
@@ -271,7 +275,7 @@ class _TripDashboardState extends State<TripDashboard> {
         try {
           await _checkWeatherAndSave(targetPlan);
         } catch (e) {
-          debugPrint('Weather check failed: $e');
+          AppLogger.e('TripDashboard', 'Weather check failed: ${e.toString()}');
         }
         _generateAiNote(targetPlan);
       }
@@ -307,12 +311,6 @@ class _TripDashboardState extends State<TripDashboard> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('ack_plan_$planId', true);
   }
-
-  Future<bool> _isAcknowledgedForPlan(int planId) async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool('ack_plan_$planId') ?? false;
-  }
-
   Future<bool> _isAcknowledgedForPlanWithSnapshot(int planId, dynamic snapshot) async {
     final prefs = await SharedPreferences.getInstance();
     // If the global plan ack exists, treat as acknowledged
@@ -547,8 +545,7 @@ class _TripDashboardState extends State<TripDashboard> {
           },
         );
       });
-    } catch (e, st) {
-      debugPrint('Error loading danger snapshot: $e');
+    } catch (e) {
       if (!mounted) { return; }
       SchedulerBinding.instance.addPostFrameCallback((_) {
         if (!mounted) { return; }
@@ -584,7 +581,7 @@ class _TripDashboardState extends State<TripDashboard> {
         }
       }
     } catch (e) {
-      debugPrint('Geocoding failed: $e');
+      AppLogger.e('TripDashboard', 'Geocoding failed: ${e.toString()}');
     }
 
     if (lat == null || lon == null) return;
@@ -595,15 +592,28 @@ class _TripDashboardState extends State<TripDashboard> {
     if (planId != null) {
       final planRow = await _db.getPlanById(planId);
       if (planRow != null) {
-        try { final sd = planRow['start_date']?.toString(); if (sd != null && sd.isNotEmpty) startDate = DateTime.tryParse(sd); } catch (_) {}
-        try { final d = planRow['duration_days']; if (d is int) durationDays = d; else if (d is String) durationDays = int.tryParse(d) ?? durationDays; } catch (_) {}
+        try {
+          final sd = planRow['start_date']?.toString();
+          if (sd != null && sd.isNotEmpty) {
+            startDate = DateTime.tryParse(sd);
+          }
+        } catch (_) {}
+
+        try {
+          final d = planRow['duration_days'];
+          if (d is int) {
+            durationDays = d;
+          } else if (d is String) {
+            durationDays = int.tryParse(d) ?? durationDays;
+          }
+        } catch (_) {}
       }
     }
-    if (startDate == null) startDate = DateTime.now().toUtc();
+    startDate ??= DateTime.now().toUtc();
     final endDate = startDate.add(Duration(days: durationDays));
 
-    final startStr = '${startDate.toIso8601String().split('T').first}';
-    final endStr = '${endDate.toIso8601String().split('T').first}';
+    final startStr = startDate.toIso8601String().split('T').first;
+    final endStr = endDate.toIso8601String().split('T').first;
 
     final weatherUrl = Uri.parse('https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,windspeed_10m_max&timezone=UTC&start_date=$startStr&end_date=$endStr');
 
@@ -612,7 +622,7 @@ class _TripDashboardState extends State<TripDashboard> {
       final wres = await http.get(weatherUrl);
       if (wres.statusCode == 200) weatherJson = jsonDecode(wres.body) as Map<String, dynamic>?;
     } catch (e) {
-      debugPrint('Weather fetch failed: $e');
+      AppLogger.e('TripDashboard', 'Weather fetch failed: ${e.toString()}');
     }
     if (weatherJson == null) return;
 
@@ -645,15 +655,15 @@ class _TripDashboardState extends State<TripDashboard> {
         }
       }
     } catch (e) {
-      debugPrint('Weather analysis error: $e');
+      AppLogger.e('TripDashboard', 'Weather analysis error: ${e.toString()}');
     }
 
     if (snapshot.isNotEmpty && planId != null) {
       try {
         await _db.saveDangerSnapshotForPlan(planId, snapshot);
-        debugPrint('Saved danger snapshot for plan $planId');
+        AppLogger.d('TripDashboard', 'Saved danger snapshot for plan $planId');
       } catch (e) {
-        debugPrint('Failed to save danger snapshot: $e');
+        AppLogger.e('TripDashboard', 'Failed to save danger snapshot: ${e.toString()}');
       }
     }
   }
@@ -781,7 +791,11 @@ class _ItemsTabState extends State<_ItemsTab> {
 
   void _toggleItemChecked(String id, bool? value) {
     setState(() {
-      if (value == true) _checked.add(id); else _checked.remove(id);
+      if (value == true) {
+        _checked.add(id);
+      } else {
+        _checked.remove(id);
+      }
     });
     _saveLocalChecklist();
   }
@@ -891,7 +905,7 @@ class _ItemsTabState extends State<_ItemsTab> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2))
+          BoxShadow(color: Colors.black.withAlpha(10), blurRadius: 8, offset: const Offset(0, 2))
         ],
       ),
       child: Column(
@@ -917,7 +931,11 @@ class _ItemsTabState extends State<_ItemsTab> {
                 child: imageUrl != null && imageUrl.isNotEmpty
                     ? ClipRRect(
                   borderRadius: BorderRadius.circular(12),
-                  child: Image.network(imageUrl, fit: BoxFit.cover, errorBuilder: (_,__,___) => const Icon(Icons.broken_image, color:Colors.grey)),
+                  child: Image.network(
+                    imageUrl,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image, color: Colors.grey),
+                  ),
                 )
                     : const Icon(Icons.hiking, color: Colors.grey),
               ),
@@ -960,9 +978,9 @@ class _ItemsTabState extends State<_ItemsTab> {
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                         decoration: BoxDecoration(
-                          color: Colors.orange.withOpacity(0.1),
+                          color: Colors.orange.withAlpha(26),
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.orange.withOpacity(0.5)),
+                          border: Border.all(color: Colors.orange.withAlpha(128)),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -1131,13 +1149,13 @@ class _RouteTabState extends State<_RouteTab> with AutomaticKeepAliveClientMixin
           .select('*')
           .eq('route_id', routeId);
 
-      if (mounted && wptResponse != null) {
+      if (mounted) {
         setState(() {
           _waypointsData = List<Map<String, dynamic>>.from(wptResponse);
         });
       }
     } catch (e) {
-      debugPrint("🔴 Lỗi _prepareData: $e");
+      // _prepareData error suppressed to avoid noisy logs
       if (mounted) setState(() => _isMapLoading = false);
     }
   }
@@ -1235,7 +1253,7 @@ class _RouteTabState extends State<_RouteTab> with AutomaticKeepAliveClientMixin
     final Canvas canvas = Canvas(pictureRecorder);
     const int size = 100; final double radius = size / 2;
 
-    final Paint shadowPaint = Paint()..color = Colors.black.withOpacity(0.4)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5.0);
+    final Paint shadowPaint = Paint()..color = Colors.black.withAlpha(102)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5.0);
     canvas.drawCircle(Offset(radius, radius + 3), radius, shadowPaint);
 
     final Paint borderPaint = Paint()..color = Colors.white;
@@ -1299,7 +1317,7 @@ class _RouteTabState extends State<_RouteTab> with AutomaticKeepAliveClientMixin
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.9),
+              color: Colors.white.withAlpha(230),
               borderRadius: BorderRadius.circular(4),
               border: Border.all(color: Colors.grey[300]!),
             ),
@@ -1454,7 +1472,7 @@ class _RouteTabState extends State<_RouteTab> with AutomaticKeepAliveClientMixin
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.6),
+                    color: Colors.black.withAlpha(153),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(color: Colors.white30),
                   ),
@@ -1519,7 +1537,7 @@ class _RouteTabState extends State<_RouteTab> with AutomaticKeepAliveClientMixin
                         belowBarData: BarAreaData(
                           show: true,
                           gradient: LinearGradient(
-                            colors: [kPrimaryGreen.withOpacity(0.3), Colors.white],
+                            colors: [kPrimaryGreen.withAlpha(77), Colors.white],
                             begin: Alignment.topCenter,
                             end: Alignment.bottomCenter,
                           ),
@@ -1556,9 +1574,9 @@ class _RouteTabState extends State<_RouteTab> with AutomaticKeepAliveClientMixin
                   width: double.infinity,
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.purple.withOpacity(0.05),
+                    color: Colors.purple.withAlpha(13),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.purple.withOpacity(0.1)),
+                    border: Border.all(color: Colors.purple.withAlpha(26)),
                   ),
                   child: Text(
                     widget.aiNote ?? "Không có thông tin bổ sung.",
@@ -1684,7 +1702,7 @@ class _NotesTab extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
+                    color: Colors.black.withAlpha(13),
                     blurRadius: 4,
                     offset: const Offset(0, 2),
                   )
