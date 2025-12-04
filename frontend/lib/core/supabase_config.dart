@@ -1,3 +1,16 @@
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 // Central Supabase configuration used by the app.
-const String supabaseUrl = 'https://qesmaldvlbfznrkrzdhc.supabase.co';
-const String supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFlc21hbGR2bGJmem5ya3J6ZGhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM3MjA3ODEsImV4cCI6MjA3OTI5Njc4MX0.bMDQmD99x7CdFTOfakCkHqQQsWcac5sc4awO6hMXfRQ';
+// Prefers compile-time `--dart-define` values, falls back to `flutter_dotenv`.
+
+String get supabaseUrl {
+	const fromDefine = String.fromEnvironment('SUPABASE_URL');
+	if (fromDefine.isNotEmpty) return fromDefine;
+	return dotenv.env['SUPABASE_URL'] ?? 'https://your-project-id.supabase.co';
+}
+
+String get supabaseAnonKey {
+	const fromDefine = String.fromEnvironment('SUPABASE_ANON_KEY');
+	if (fromDefine.isNotEmpty) return fromDefine;
+	return dotenv.env['SUPABASE_ANON_KEY'] ?? dotenv.env['SUPABASE_KEY'] ?? 'your_supabase_anon_key_here';
+}

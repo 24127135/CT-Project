@@ -17,7 +17,15 @@ import socket
 import urllib.parse as urlparse
 import logging
 
-load_dotenv()
+# Prefer loading a repo-level .env (one central file). If not present, fall back to default
+# location resolution used by python-dotenv.
+REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ENV = REPO_ROOT / '.env'
+if REPO_ENV.exists():
+    load_dotenv(dotenv_path=str(REPO_ENV))
+else:
+    # No repo-level .env found — load default behavior (looks in CWD and parents)
+    load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent

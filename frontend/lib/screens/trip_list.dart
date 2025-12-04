@@ -123,6 +123,7 @@ class _TripListViewState extends State<TripListView> {
                               }
                               try {
                                 final id = (idVal is int) ? idVal : int.parse(idVal.toString());
+                                // perform deletion via Supabase service
                                 await _db.deletePlan(id);
                                 if (!mounted) return;
                                 scaffold.showSnackBar(const SnackBar(content: Text('Đã xóa chuyến đi'), backgroundColor: Colors.green));
@@ -160,28 +161,76 @@ class _PlanCard extends StatelessWidget {
     final title = plan['name'] ?? plan['title'] ?? 'Chuyến đi không tên';
     final location = plan['location'] ?? '';
     final duration = plan['duration_days'] ?? plan['duration'];
+    // 🟢 Extract Plan ID safely
+    final int? planId = (plan['id'] is int) ? plan['id'] : int.tryParse(plan['id'].toString());
 
     return GestureDetector(
       onTap: () {
-        Navigator.push(context, MaterialPageRoute(builder: (context) => const TripDashboard()));
+        // 🟢 Pass the ID to Dashboard
+        Navigator.push(context, MaterialPageRoute(builder: (context) => TripDashboard(planId: planId)));
       },
       child: ClipRRect(
         borderRadius: BorderRadius.circular(24),
         child: Stack(
           children: [
-            // Gradient background matching the fast input card style.
+            // Background: try to show the route image (from joined `routes` relation)
             Container(
               height: 180,
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [Color(0xFF425E3C), Color(0xFF2E7D32)],
-                ),
-              ),
-            ),
+              color: const Color(0xFF425E3C),
+              child: Builder(builder: (ctx) {
+                // Attempt to read nested route object
+                final routeObj = plan['routes'];
+                String? imageUrl;
+                if (routeObj is Map) {
+                  // Try a few possible field names
+                  if (routeObj['gallery_image_urls'] is List && (routeObj['gallery_image_urls'] as List).isNotEmpty) {
+                    final g = routeObj['gallery_image_urls'] as List;
+                    imageUrl = g.first?.toString();
+                  }
+                  imageUrl ??= routeObj['image_url']?.toString();
+                  imageUrl ??= routeObj['imageUrl']?.toString();
+                  imageUrl ??= routeObj['image']?.toString();
+                }
 
-            // Content overlay
+                if (imageUrl != null && imageUrl.isNotEmpty) {
+                  return ClipRRect(
+                    borderRadius: BorderRadius.circular(24),
+                    child: Image.network(
+                      imageUrl,
+                      height: 180,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      errorBuilder: (c, e, st) {
+                        // Fallback to gradient when image fails
+                        return Container(
+                          height: 180,
+                          decoration: const BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [Color(0xFF425E3C), Color(0xFF2E7D32)],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  );
+                }
+
+                // Default fallback: gradient background (keeps previous look)
+                return Container(
+                  height: 180,
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Color(0xFF425E3C), Color(0xFF2E7D32)],
+                    ),
+                  ),
+                );
+              }),
+            ),
+            // ... Content ...
             Positioned.fill(
               child: Container(
                 padding: const EdgeInsets.all(20),
@@ -217,15 +266,12 @@ class _PlanCard extends StatelessWidget {
                 ),
               ),
             ),
-
-            // Action: delete
+            // ... Delete Button ...
             Positioned(
               top: 8,
               right: 8,
               child: GestureDetector(
                 onTap: () {
-                  // Call the async delete callback without awaiting here to
-                  // satisfy the GestureDetector's sync callback signature.
                   onDeleteRequested();
                 },
                 child: Container(

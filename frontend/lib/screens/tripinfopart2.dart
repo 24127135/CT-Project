@@ -47,6 +47,20 @@ class _TripTimeScreenState extends State<TripTimeScreen> {
     if (results != null && results.length == 2 && results[0] != null && results[1] != null) {
       final start = results[0]!.isBefore(results[1]!) ? results[0]! : results[1]!;
       final end = results[0]!.isBefore(results[1]!) ? results[1]! : results[0]!;
+      // Prevent selecting a start date in the past (compare using date-only)
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final startDateOnly = DateTime(start.year, start.month, start.day);
+      if (startDateOnly.isBefore(today)) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Không thể chọn ngày khởi hành trong quá khứ.'),
+            backgroundColor: Colors.red,
+          ));
+        }
+        return;
+      }
+
       context.read<TripProvider>().setTripDates(start, end);
     }
   }

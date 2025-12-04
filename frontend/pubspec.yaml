@@ -9,34 +9,41 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-
+  url_launcher: ^6.2.5
+  flutter_dotenv: ^5.1.0
   dio: ^5.4.3
   flutter_secure_storage: ^9.0.0
   intl: ^0.20.2
   shared_preferences: ^2.3.2
-# Connect to django
   http: ^1.2.0
   provider: ^6.0.0
   supabase_flutter: ^2.10.3
   calendar_date_picker2: ^1.1.4
-
+  google_generative_ai: ^0.4.6
+  
+  # Giữ bản mới nhất để fix lỗi Android Registrar
+  maplibre_gl: ^0.24.1
+  fl_chart: ^0.66.0
+  flutter_map: ^6.1.0   
+  latlong2: ^0.9.0
+  
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.2
 
-  # Launcher icon generator
-  flutter_launcher_icons: ^0.11.0
+# --- THÊM PHẦN NÀY ĐỂ SỬA LỖI XUNG ĐỘT ---
+dependency_overrides:
+  js: ^0.7.2
+# -----------------------------------------
 
 flutter:
   uses-material-design: true
   assets:
     - assets/icon/app_icon.png
+    - .env
 
-# Configuration for flutter_launcher_icons. After adding your source
-# icon at `assets/icon/app_icon.png`, run:
-#   flutter pub get
-#   flutter pub run flutter_launcher_icons:main
 flutter_icons:
   android: true
   image_path: "assets/icon/app_icon.png"

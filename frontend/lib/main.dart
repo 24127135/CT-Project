@@ -8,7 +8,13 @@ import 'providers/trip_provider.dart';
 import 'core/supabase_config.dart';
 import 'services/session_lifecycle_service.dart';
 
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'utils/notification.dart';
+
 Future<void> main() async {
+  // load API key first
+  await dotenv.load(fileName: ".env");
+  
   WidgetsFlutterBinding.ensureInitialized();
 
   await Supabase.initialize(
@@ -16,10 +22,8 @@ Future<void> main() async {
     anonKey: supabaseAnonKey,
   );
 
-  // Lấy kết quả xem có phải Cold Start không?
-  // isColdStart = true nghĩa là vừa tắt app bật lại -> Phải về Welcome
+  // Lấy kết quả xem có phải Cold Start không? (vẫn lấy để logging)
   final bool isColdStart = await SessionLifecycleService.checkIsColdStart();
-
   runApp(
     MultiProvider(
       providers: [
@@ -39,26 +43,26 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 1. Lấy session hiện tại (có thể vẫn còn cache trong RAM dù đã signOut)
+    // 1. Lấy session hiện tại (Supabase client caches sessions)
     final session = Supabase.instance.client.auth.currentSession;
 
-    debugPrint("--- [MyApp Check] ColdStart: $isColdStart | Session: ${session != null ? 'Có' : 'Không'} ---");
-
-    // 2. LOGIC QUYẾT ĐỊNH MÀN HÌNH KHỞI ĐỘNG (QUAN TRỌNG)
+    // 2. LOGIC QUYẾT ĐỊNH MÀN HÌNH KHỞI ĐỘNG
+    // On a cold start enforce logout (show Welcome). Otherwise, if a session
+    // exists go to Home, else show Welcome.
     Widget startScreen;
-
     if (isColdStart) {
-      // Nếu là Cold Start -> BẮT BUỘC về Welcome (kệ session nói gì)
       startScreen = const WelcomeView();
-    } else if (session != null) {
-      // Nếu không phải Cold Start (Hot restart) VÀ có session -> Vào Home
+    }
+    else if (session != null) {
       startScreen = const HomePage();
-    } else {
-      // Còn lại -> Welcome
+    }
+    else {
       startScreen = const WelcomeView();
     }
 
     return MaterialApp(
+      scaffoldMessengerKey: NotificationService.messengerKey,
+      navigatorKey: NotificationService.navigatorKey,
       title: 'Trek Guide',
       debugShowCheckedModeBanner: false,
       routes: {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 // debugPrint is provided by material.dart; no separate foundation import needed
 import 'package:provider/provider.dart';
+import 'package:frontend/utils/notification.dart';
 import '../providers/trip_provider.dart';
 import '../screens/home_screen.dart';
 import 'trip_info_waiting_screen.dart';
@@ -137,25 +138,18 @@ class _TripConfirmScreenState extends State<TripConfirmScreen> {
                     String tName = _tripNameController.text.isEmpty ? "Mẫu mới" : _tripNameController.text;
 
                     // Hiện thông báo đang xử lý
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Đang lưu mẫu...'), duration: Duration(milliseconds: 800)),
-                    );
+                    NotificationService.showInfo('Đang lưu mẫu...', duration: const Duration(milliseconds: 800));
 
                     // GỌI PROVIDER (Logic đúng đã fix)
                     await context.read<TripProvider>().saveHistoryInput(tName);
 
                     // Thông báo thành công
                     if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('✅ Đã lưu mẫu thành công!'), backgroundColor: Colors.green),
-                      );
-                      debugPrint("Lưu mẫu thành công!");
+                      NotificationService.showSuccess('✅ Đã lưu mẫu thành công!');
                     }
                   } catch (e) {
                     if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Lỗi: $e'), backgroundColor: Colors.red),
-                      );
+                      NotificationService.showError('Lỗi: $e');
                     }
                   }
                 },
@@ -175,13 +169,26 @@ class _TripConfirmScreenState extends State<TripConfirmScreen> {
             // 3. Nút "Xác nhận" (Màu xanh) - CHỈ CHUYỂN TRANG
             Expanded(
               child: ElevatedButton(
-                onPressed: () {
-                  Navigator.push(context, MaterialPageRoute(builder: (context) => const WaitingScreen()));
-                },
-                style: ElevatedButton.styleFrom(backgroundColor: primaryGreen, padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)), elevation: 2),
-                child: const Text('Xác nhận', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  onPressed: () async {
+                    // Start the preference-matching flow without saving a draft here.
+                    // The plan will be created when the user confirms a route.
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const WaitingScreen()),
+                    );
+                  },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryGreen, // Đảm bảo biến primaryGreen đã được import/khai báo
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  elevation: 2,
+                ),
+                child: const Text(
+                  'Xác nhận',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                ),
               ),
-            ),
+            )
           ],
         ),
       ),

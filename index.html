@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kiểm Tra Dữ Liệu Trekking Map</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <style>
+        body { margin: 0; padding: 0; display: flex; flex-direction: column; height: 100vh; font-family: 'Segoe UI', sans-serif; }
+        
+        /* Thanh điều khiển phía trên */
+        #controls { 
+            padding: 15px; 
+            background: #ffffff; 
+            border-bottom: 2px solid #eee; 
+            display: flex; 
+            gap: 15px; 
+            align-items: center; 
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            z-index: 1000;
+        }
+
+        #map { flex-grow: 1; z-index: 1; }
+
+        select { 
+            padding: 10px; 
+            font-size: 16px; 
+            border-radius: 6px; 
+            border: 1px solid #ccc; 
+            width: 350px; 
+            outline: none;
+        }
+
+        /* Style cho các Icon trên bản đồ */
+        .custom-icon { 
+            text-align: center; 
+            line-height: 1; 
+            transition: transform 0.2s;
+        }
+        .custom-icon:hover {
+            transform: scale(1.2);
+            z-index: 1000 !important;
+        }
+        .emoji-icon {
+            font-size: 28px;
+            filter: drop-shadow(0px 2px 3px rgba(0,0,0,0.3));
+        }
+
+        /* Loading Spinner */
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            display: none;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+    <div id="controls">
+        <label><b>🗺️ Chọn Cung Đường:</b></label>
+        <select id="routeSelect">
+            <option value="">-- Đang kết nối Database... --</option>
+        </select>
+        <div id="loading" class="loader"></div>
+        <span id="statusText" style="color: #666; font-size: 14px;"></span>
+    </div>
+
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+        // ============================================================
+        // Runtime environment for web (inject `env.js` at deploy time)
+        // - Recommended: generate a small `env.js` that sets `window.__ENV`.
+        //   Example `env.js` content:
+        //     window.__ENV = { SUPABASE_URL: 'https://...', SUPABASE_ANON_KEY: '...' };
+        // - If not injected, fallback to the placeholders below (replace before use).
+        // ============================================================
+        const ENV = window.__ENV || {};
+        const SUPABASE_URL = ENV.SUPABASE_URL || 'https://your-project-id.supabase.co';
+        // Accept either `SUPABASE_ANON_KEY` or `SUPABASE_KEY` for older files
+        const SUPABASE_KEY = ENV.SUPABASE_ANON_KEY || ENV.SUPABASE_KEY || 'your_supabase_anon_key_here';
+
+        // Khởi tạo client (Dùng tên 'dbClient' để tránh trùng lặp)
+        const dbClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        // ============================================================
+        // KHỞI TẠO BẢN ĐỒ
+        // ============================================================
+        const map = L.map('map').setView([16.0, 108.0], 5); // View toàn Việt Nam
+        
+        // Thêm lớp nền OpenStreetMap
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+
+        // Layer Group để quản lý các đối tượng vẽ (giúp xóa đi vẽ lại dễ dàng)
+        let drawingLayer = L.layerGroup().addTo(map);
+
+        // ============================================================
+        // HÀM 1: LẤY DANH SÁCH CUNG ĐƯỜNG (Dropdown)
+        // ============================================================
+        async function loadRouteList() {
+            const status = document.getElementById('statusText');
+            
+            // Gọi Supabase
+            const { data, error } = await dbClient
+                .from('routes')
+                .select('id, name')
+                .order('name');
+            
+            const select = document.getElementById('routeSelect');
+            
+            if (error) {
+                console.error("Lỗi:", error);
+                select.innerHTML = '<option>❌ Lỗi kết nối Supabase!</option>';
+                status.textContent = "Kiểm tra lại Key hoặc RLS Policy.";
+                status.style.color = "red";
+                return;
+            }
+
+            // Đổ dữ liệu vào Select
+            select.innerHTML = '<option value="">-- Chọn một cung đường để xem --</option>';
+            data.forEach(route => {
+                const option = document.createElement('option');
+                option.value = route.id;
+                option.textContent = route.name;
+                select.appendChild(option);
+            });
+
+            // Lắng nghe sự kiện chọn
+            select.addEventListener('change', (e) => {
+                if (e.target.value) loadRouteDetail(e.target.value);
+            });
+            
+            status.textContent = `Đã tải xong ${data.length} cung đường.`;
+        }
+
+        // ============================================================
+        // HÀM 2: HIỂN THỊ CHI TIẾT (Vẽ đường + Icon)
+        // ============================================================
+        async function loadRouteDetail(routeId) {
+            const loader = document.getElementById('loading');
+            loader.style.display = 'block';
+            drawingLayer.clearLayers(); // Xóa hình cũ
+
+            // 1. Lấy dữ liệu đường đi (Coordinates)
+            const { data: routeData } = await dbClient
+                .from('routes')
+                .select('name, path_coordinates')
+                .eq('id', routeId)
+                .single();
+
+            // 2. Lấy dữ liệu điểm Waypoints (Warnings, Water...)
+            const { data: wptData } = await dbClient
+                .from('route_waypoints')
+                .select('*')
+                .eq('route_id', routeId);
+
+            loader.style.display = 'none';
+
+            // --- VẼ ĐƯỜNG ĐI ---
+            if (routeData && routeData.path_coordinates && routeData.path_coordinates.length > 0) {
+                const coords = routeData.path_coordinates;
+
+                // Vẽ đường Polyline màu đỏ
+                const polyline = L.polyline(coords, {
+                    color: '#e63946', 
+                    weight: 5,
+                    opacity: 0.8,
+                    lineJoin: 'round'
+                }).addTo(drawingLayer);
+
+                // Zoom bản đồ vừa khít đường đi
+                map.fitBounds(polyline.getBounds(), { padding: [50, 50] });
+
+                // Thêm Icon ĐIỂM XUẤT PHÁT (Đầu mảng)
+                createMarker(coords[0], '🟢', '🏁 Điểm Xuất Phát', 'Bắt đầu hành trình tại đây');
+
+                // Thêm Icon ĐIỂM KẾT THÚC (Cuối mảng)
+                createMarker(coords[coords.length - 1], '🏁', '🏆 Điểm Kết Thúc', 'Hoàn thành chặng đường');
+            }
+
+            // --- VẼ CÁC ĐIỂM WAYPOINTS ---
+            if (wptData) {
+                wptData.forEach(pt => {
+                    let iconEmoji = '📍';
+                    let typeName = 'Điểm mốc';
+
+                    // Chọn Emoji dựa trên loại điểm
+                    switch(pt.type) {
+                        case 'summit':    iconEmoji = '🚩'; typeName = 'Đỉnh Núi'; break;
+                        case 'danger':    iconEmoji = '⚠️'; typeName = 'Nguy Hiểm'; break;
+                        case 'water':     iconEmoji = '💧'; typeName = 'Nguồn Nước'; break;
+                        case 'campsite':  iconEmoji = '⛺'; typeName = 'Bãi Trại'; break;
+                        case 'scenic':    iconEmoji = '📷'; typeName = 'Check-in'; break;
+                        case 'checkpoint': iconEmoji = '🛑'; typeName = 'Trạm/Mốc'; break;
+                    }
+
+                    createMarker([pt.latitude, pt.longitude], iconEmoji, pt.name, pt.description);
+                });
+            }
+        }
+
+        // Hàm phụ trợ tạo Marker nhanh
+        function createMarker(latlng, emoji, title, desc) {
+            const marker = L.marker(latlng, {
+                icon: L.divIcon({
+                    className: 'custom-icon',
+                    html: `<div class="emoji-icon">${emoji}</div>`,
+                    iconSize: [30, 30],
+                    iconAnchor: [15, 30],
+                    popupAnchor: [0, -30]
+                })
+            }).addTo(drawingLayer);
+
+            marker.bindPopup(`
+                <div style="min-width: 200px">
+                    <h3 style="margin: 0 0 5px 0; color: #2c3e50;">${title}</h3>
+                    <p style="margin: 0; color: #555; font-size: 13px;">${desc || ''}</p>
+                </div>
+            `);
+        }
+
+        // Chạy ngay khi mở web
+        loadRouteList();
+
+    </script>
+</body>
+</html>

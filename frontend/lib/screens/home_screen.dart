@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'tripinfopart1.dart'; // CORRECT: Uses the separated step 1 file for backend flow
-import 'fast_input.dart';     // CORRECT: Import Fast Input
-import 'trip_dashboard.dart'; // CORRECT: Import Dashboard for "Chuyến đi đã tạo"
+import 'tripinfopart1.dart';
+import 'fast_input.dart';
+import 'trip_list.dart' as trip_list;
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -167,7 +167,7 @@ class _HomePageState extends State<HomePage> {
                                       Navigator.push(
                                         context,
                                         MaterialPageRoute(
-                                          builder: (context) => TripListView(),
+                                          builder: (context) => const FastInputListView(),
                                         ),
                                       );
                                     },
@@ -186,10 +186,10 @@ class _HomePageState extends State<HomePage> {
                   // Card 2: Chuyến đi đã tạo
                   GestureDetector(
                     onTap: () {
-                      // Connects to DASHBOARD screen
+                      // Open the Trip List screen
                       Navigator.push(
-                        context, 
-                        MaterialPageRoute(builder: (context) => const TripDashboard())
+                        context,
+                        MaterialPageRoute(builder: (context) => trip_list.TripListView()),
                       );
                     },
                     child: Container(
