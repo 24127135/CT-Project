@@ -66,7 +66,7 @@ class MyApp extends StatelessWidget {
         '/welcome': (context) => const WelcomeView(),
       },
       // Sử dụng màn hình đã quyết định ở trên
-      home: startScreen,
+      home: const HomePage(),
     );
   }
 }

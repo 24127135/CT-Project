@@ -116,3 +116,4 @@ frontend/.env
 # --- NGOẠI LỆ: Cho phép file ví dụ ---
 !.env.example
 !backend/.env.example
+frontend/lib/main.dart
