@@ -9,14 +9,14 @@ import 'tripinfopart3.dart';
 import 'tripinfopart4.dart';
 import 'tripinfopart5.dart';
 
-class TripListView extends StatefulWidget {
-  const TripListView({super.key});
+class FastInputListView extends StatefulWidget {
+  const FastInputListView({super.key});
 
   @override
-  State<TripListView> createState() => _TripListViewState();
+  State<FastInputListView> createState() => _FastInputListViewState();
 }
 
-class _TripListViewState extends State<TripListView> {
+class _FastInputListViewState extends State<FastInputListView> {
   final SupabaseDbService _db = SupabaseDbService();
   late Future<List<Map<String, dynamic>>> _historyFuture;
 

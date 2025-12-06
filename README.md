@@ -170,3 +170,37 @@ Design data collection and analysis modules, then a simple recommendation algori
 
 ---
 *Generated based on the project description from fit@hcmus, VNUHCM - University of Science, Faculty of Information Technology.*
+
+## Web deployment: injecting runtime environment (`env.js`)
+
+For static web hosts it's common to inject a small `env.js` that sets runtime variables accessible to the client. This repo includes a helper script at `scripts/generate_env_js.ps1` which writes `window.__ENV = {...};`.
+
+Quick steps
+
+- Generate `env.js` from environment variables (write to the frontend `web` folder):
+
+```powershell
+# from repo root
+.\scripts\generate_env_js.ps1 -Out "frontend/web/env.js"
+```
+
+- Or read from a `.env` file and generate `env.js`:
+
+```powershell
+.\scripts\generate_env_js.ps1 -EnvFile "frontend/.env" -Out "frontend/web/env.js"
+```
+
+- Include the generated file in `frontend/web/index.html` (before other scripts):
+
+```html
+<script src="env.js"></script>
+<!-- then your app scripts -->
+```
+
+Notes
+
+- Local development: this repository prefers a single repo-level `.env` at the project root. The Django backend is configured to load `./.env` from the repo root; use `scripts/setup_local_env.ps1` to copy or sync values into `frontend/.env` when needed for Flutter local dev.
+
+- Do NOT include privileged server secrets (service-role keys, private JWT secrets) in `env.js` — only client-scoped/public keys.
+- Add the generated `env.js` to `.gitignore` if you generate it locally. In CI, generate it from secure pipeline variables and publish with the static assets.
+- For Flutter web builds that use `--dart-define`, prefer passing values at build time for production; `env.js` is helpful for static hosting where build-time injection isn't available.

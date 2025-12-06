@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 // Import đúng các file
-import '../../providers/trip_provider.dart';
+import '../providers/trip_provider.dart';
 import '../features/preference_matching/models/route_model.dart';
 import '../features/preference_matching/screen/preference_matching_page.dart';
-
 class WaitingScreen extends StatefulWidget {
   const WaitingScreen({super.key});
 
@@ -22,22 +21,15 @@ class _WaitingScreenState extends State<WaitingScreen> {
 
   Future<void> _fetchData() async {
     try {
-      // 1. Gọi API (Thêm delay giả lập cho đẹp nếu muốn)
-      await Future.delayed(const Duration(seconds: 2));
-
-      if (!mounted) return;
-      final rawData = await context.read<TripProvider>().fetchSuggestedRoutes();
-
       if (!mounted) return;
 
-      // 2. Parse dữ liệu: JSON -> RouteModel
-      final List<RouteModel> routes = rawData.map((item) {
-        return RouteModel.fromJson(item);
-      }).toList();
+      // Fetch suggested routes from provider
+      final List<RouteModel> routes = await context.read<TripProvider>().fetchSuggestedRoutes();
 
-      // 3. Chuyển hướng sang PreferenceMatchingPage
-      // Lưu ý: Ta truyền list 'routes' sang. Nếu nó rỗng [], trang kia sẽ tự hiện Empty State.
-      Navigator.of(context).pushReplacement(
+      if (!mounted) return;
+
+      // Navigate to preference matching page with fetched routes
+      await Navigator.of(context).pushReplacement(
         MaterialPageRoute(
           builder: (context) => PreferenceMatchingPage(routes: routes),
         ),
@@ -45,17 +37,33 @@ class _WaitingScreenState extends State<WaitingScreen> {
 
     } catch (error) {
       if (!mounted) return;
-      // 4. Xử lý lỗi (Ví dụ mất mạng, server sập)
-      // Lúc này vẫn có thể chuyển sang PreferenceMatchingPage với list rỗng để hiện thông báo
-      // Hoặc hiện Dialog báo lỗi cụ thể. Ở đây mình chọn hiện trang Empty State cho đồng bộ.
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (context) => const PreferenceMatchingPage(routes: []),
-        ),
-      );
+      
+      // Show error dialog
+      if (!mounted) return;
+      try {
+        await showDialog<void>(
+          context: context,
+          builder: (c) => AlertDialog(
+            title: const Text('Lỗi'),
+            content: Text('Không thể tìm lộ trình: $error'),
+            actions: [TextButton(onPressed: () => Navigator.of(c).pop(), child: const Text('Đóng'))],
+          ),
+        );
+      } catch (e) {
+        // Silently fail if dialog cannot be shown
+      }
 
-      // Hoặc nếu muốn debug thì uncomment dòng dưới để xem lỗi
-      // print("Lỗi fetch data: $error");
+      // Navigate to empty-state preference page
+      if (!mounted) return;
+      try {
+        await Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (context) => const PreferenceMatchingPage(routes: []),
+          ),
+        );
+      } catch (e) {
+        // Silently fail if navigation fails
+      }
     }
   }
 

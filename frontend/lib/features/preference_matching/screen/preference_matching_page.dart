@@ -5,6 +5,9 @@ import 'package:frontend/features/preference_matching/screen/route_profile_page.
 import 'package:frontend/utils/app_colors.dart';
 import 'package:frontend/utils/app_styles.dart';
 import 'package:frontend/widgets/custom_button.dart';
+import 'package:provider/provider.dart';
+import '../../../screens/home_screen.dart';
+import '../../../providers/trip_provider.dart';
 
 class PreferenceMatchingPage extends StatelessWidget {
   final List<RouteModel>? routes;
@@ -68,8 +71,35 @@ class PreferenceMatchingPage extends StatelessWidget {
             const SizedBox(height: 24),
             CustomButton(
               text: 'VỀ TRANG CHỦ',
-              onPressed: () {
-                Navigator.popUntil(context, (route) => route.isFirst);
+              onPressed: () async {
+                // Capture navigator and provider synchronously to avoid using `context` after async gaps
+                final navigator = Navigator.of(context);
+                final tripProvider = Provider.of<TripProvider>(context, listen: false);
+
+                final shouldCancel = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('Quay về trang chủ'),
+                    content: const Text('Bạn có muốn hủy kế hoạch hiện tại và trở về trang chủ?'),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Không')),
+                      TextButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Có', style: TextStyle(color: Colors.red))),
+                    ],
+                  ),
+                );
+
+                if (shouldCancel != true) return;
+
+                try {
+                  await tripProvider.cancelDraftPlan();
+                } catch (_) {
+                  // ignore errors but log
+                }
+
+                navigator.pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (_) => const HomePage()),
+                  (route) => false,
+                );
               },
               backgroundColor: AppColors.primaryGreen,
             ),

@@ -16,6 +16,10 @@ class Route(models.Model):
 
     image_url = models.URLField(max_length=500, null=True, blank=True)
     gallery = models.JSONField(default=list, blank=True)
+    
+    class Meta:
+        db_table = 'routes'  # Align with Supabase table
+
     def __str__(self):
         return self.name
 
@@ -33,12 +37,20 @@ class Plan(models.Model):
     start_date = models.DateField()
     duration_days = models.IntegerField()
     difficulty = models.TextField()
-    personal_interest = models.JSONField()
+    
+    # FIXED: Renamed to plural to match PDF
+    personal_interests = models.JSONField(default=list, blank=True) 
     # --- ---
 
     # Dữ liệu do AI/Service tạo ra [cite: 1343]
     personalized_equipment_list = models.JSONField(null=True, blank=True)
     dangers = models.JSONField(null=True, blank=True)
+    
+    # Field for safety warning snapshot
+    dangers_snapshot = models.JSONField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'plans'  # Align with Supabase table
 
     def __str__(self):
         return self.name
@@ -55,9 +67,28 @@ class HistoryInput(models.Model):
     start_date = models.DateField()
     duration_days = models.IntegerField()
     difficulty = models.TextField()
-    personal_interest = models.JSONField()
+    
+    # FIXED: Renamed to plural to match PDF
+    personal_interests = models.JSONField(default=list, blank=True)
 
     template_name = models.CharField(max_length=255, default="Mẫu nhập nhanh")
 
+    class Meta:
+        db_table = 'history_inputs'  # Align with Supabase table
+
     def __str__(self):
         return f"{self.template_name} (của {self.user.email})"
+
+
+class Equipment(models.Model):
+    name = models.CharField(max_length=255)
+    category = models.CharField(max_length=100)
+    price = models.FloatField()
+    image_url = models.URLField(max_length=500, null=True, blank=True)
+    weight_grams = models.IntegerField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'equipment'
+
+    def __str__(self):
+        return self.name
