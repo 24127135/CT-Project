@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import '../features/preference_matching/models/route_model.dart';
@@ -92,7 +93,15 @@ class GeminiService {
     try {
       debugPrint("🤖 Đang gửi yêu cầu cho Gemini...");
       final content = [Content.text(prompt)];
-      final response = await _model.generateContent(content);
+      
+      // Add 30-second timeout to prevent indefinite hanging
+      final response = await _model.generateContent(content).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          debugPrint("⚠️ Gemini API timeout - using fallback routes");
+          throw TimeoutException('Gemini API did not respond within 30 seconds');
+        },
+      );
 
       if (response.text == null) return [];
 
@@ -176,7 +185,15 @@ class GeminiService {
     try {
       debugPrint("🤖 Gemini: Generating checklist...");
       final content = [Content.text(prompt)];
-      final response = await _model.generateContent(content);
+      
+      // Add 30-second timeout
+      final response = await _model.generateContent(content).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          debugPrint("⚠️ Gemini API timeout (checklist)");
+          throw TimeoutException('Gemini API did not respond within 30 seconds');
+        },
+      );
 
       if (response.text == null) return {};
 
@@ -213,7 +230,15 @@ class GeminiService {
 
     try {
       final content = [Content.text(prompt)];
-      final response = await _model.generateContent(content);
+      
+      // Add 30-second timeout
+      final response = await _model.generateContent(content).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          debugPrint("⚠️ Gemini API timeout (route note)");
+          throw TimeoutException('Gemini API did not respond within 30 seconds');
+        },
+      );
       return response.text ?? "Không thể tạo ghi chú AI lúc này.";
     } catch (e) {
       debugPrint("❌ Gemini Error (Route Note): $e");
