@@ -293,7 +293,6 @@ class TripProvider with ChangeNotifier {
   // Đã chuyển sang gọi Supabase trực tiếp
   Future<List<RouteModel>> fetchSuggestedRoutes() async {
     try {
-      
       // Bước A: Lấy dữ liệu thô từ Supabase (Lọc sơ bộ)
       final rawData = await _supabaseDb.getSuggestedRoutes(
         location: _searchLocation, // Lọc theo địa điểm user nhập
@@ -303,7 +302,14 @@ class TripProvider with ChangeNotifier {
       );
 
       // Convert sang List RouteModel
-      List<RouteModel> initialRoutes = rawData.map((item) => RouteModel.fromJson(item)).toList();
+      final List<RouteModel> initialRoutes = [];
+      for (final item in rawData) {
+        try {
+          initialRoutes.add(RouteModel.fromJson(Map<String, dynamic>.from(item as Map)));
+        } catch (e) {
+          AppLogger.e('TripProvider', 'Failed to parse route item: ${e.toString()}');
+        }
+      }
 
       // Nếu Supabase không tìm thấy gì, trả về rỗng luôn
       if (initialRoutes.isEmpty) {
@@ -312,7 +318,6 @@ class TripProvider with ChangeNotifier {
       }
 
       // Bước B: Gửi cho AI phân tích (Tinh chỉnh & Viết lời khuyên)
-      
       final aiRoutes = await _geminiService.recommendRoutes(
         allRoutes: initialRoutes,
         userLocation: _searchLocation,
@@ -323,14 +328,13 @@ class TripProvider with ChangeNotifier {
       );
 
       return aiRoutes;
-
     } catch (e) {
       AppLogger.e('TripProvider', 'Error fetching suggested routes: ${e.toString()}');
       return [];
     }
   }
 
-  // Hàm reset
+  /// Reset all trip state variables to initial values for a fresh trip creation
   void resetTrip() {
     _searchLocation = '';
     _accommodation = null;
@@ -341,7 +345,8 @@ class TripProvider with ChangeNotifier {
     _note = '';
     _selectedInterests = [];
     _tripName = '';
-    _currentPlanId = null; // Reset ID too
+    _currentPlanId = null;
+    AppLogger.d('TripProvider', 'Trip state reset');
     notifyListeners();
   }
 }

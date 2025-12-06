@@ -45,11 +45,14 @@ class _TripConfirmScreenState extends State<TripConfirmScreen> {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () {
-            Navigator.pushAndRemoveUntil(
-              context,
-              MaterialPageRoute(builder: (context) => const HomePage()),
-                  (route) => false,
-            );
+            // Use simple pop to return to the previous screen instead of
+            // replacing the whole navigation stack. This avoids accidental
+            // navigation to the welcome screen in edge cases.
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            } else {
+              Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => const HomePage()));
+            }
           },
         ),
         title: const Column(
@@ -170,12 +173,17 @@ class _TripConfirmScreenState extends State<TripConfirmScreen> {
             Expanded(
               child: ElevatedButton(
                   onPressed: () async {
-                    // Start the preference-matching flow without saving a draft here.
-                    // The plan will be created when the user confirms a route.
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const WaitingScreen()),
-                    );
+                    try {
+                      // Start the preference-matching flow without saving a draft here.
+                      // The plan will be created when the user confirms a route.
+                      if (!mounted) return;
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const WaitingScreen()),
+                      );
+                    } catch (e) {
+                      if (context.mounted) NotificationService.showError('Không thể bắt đầu tìm lộ trình: $e');
+                    }
                   },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: primaryGreen, // Đảm bảo biến primaryGreen đã được import/khai báo

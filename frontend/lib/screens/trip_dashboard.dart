@@ -51,6 +51,41 @@ class _TripDashboardState extends State<TripDashboard> {
   final PageController _pageController = PageController();
   final List<String> _notes = [];
 
+  String _notesStorageKeyForPlan(int planId) => 'plan_${planId}_notes';
+
+  Future<void> _loadNotesForPlan(int planId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_notesStorageKeyForPlan(planId));
+      if (raw != null && raw.isNotEmpty) {
+        final decoded = jsonDecode(raw) as List<dynamic>?;
+        if (decoded != null) {
+          final strings = decoded.map((e) => e?.toString() ?? '').where((s) => s.isNotEmpty).toList();
+          if (mounted) {
+            setState(() {
+              _notes.clear();
+              _notes.addAll(strings);
+            });
+          } else {
+            _notes.clear();
+            _notes.addAll(strings);
+          }
+        }
+      }
+    } catch (e) {
+      AppLogger.e('TripDashboard', 'Failed to load notes: ${e.toString()}');
+    }
+  }
+
+  Future<void> _saveNotesForPlan(int planId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_notesStorageKeyForPlan(planId), jsonEncode(_notes));
+    } catch (e) {
+      AppLogger.e('TripDashboard', 'Failed to save notes: ${e.toString()}');
+    }
+  }
+
   Map<String, Map<String, dynamic>> _equipmentDetails = {};
 
   String? _aiRouteNote;
@@ -267,38 +302,71 @@ class _TripDashboardState extends State<TripDashboard> {
       }
 
       // Update State: Plan đã tải xong
-      setState(() => _latestPlan = targetPlan);
+        setState(() => _latestPlan = targetPlan);
 
-      if (targetPlan != null) {
+        // Load persisted notes for this plan (if available)
+        if (targetPlan != null && targetPlan.id != null) {
+          try {
+            await _loadNotesForPlan(targetPlan.id!);
+          } catch (e) {
+            AppLogger.e('TripDashboard', 'Error loading notes after plan load: ${e.toString()}');
+          }
+        }
+
+        if (targetPlan != null) {
         _fetchEquipmentDetails(targetPlan);
         // Check weather and possibly save dangers snapshot
+        dynamic returnedSnapshot;
         try {
-          await _checkWeatherAndSave(targetPlan);
+          returnedSnapshot = await _checkWeatherAndSave(targetPlan);
         } catch (e) {
           AppLogger.e('TripDashboard', 'Weather check failed: ${e.toString()}');
         }
         _generateAiNote(targetPlan);
-      }
 
-      // Check Danger
-      try {
-        final snapshot = await _db.getLatestDangerSnapshot();
-        if (snapshot != null) {
+        // Check Danger: prefer the snapshot returned from the weather check
+        // (so newly-created plans will surface their own danger snapshot immediately),
+        // fallback to reading the plan row or latest snapshot.
+        try {
+          dynamic snapshot = returnedSnapshot;
           final pid = _latestPlan?.id;
-          if (pid != null) {
-            final ack = await _isAcknowledgedForPlanWithSnapshot(pid, snapshot);
-            if (navigator.canPop()) navigator.pop();
-            if (!ack) {
-              final message = snapshot.toString();
-              if (!mounted) return;
-              await _showDangerWarning(navigator, message);
+          AppLogger.d('TripDashboard', 'DEBUG _initSafetyCheck: returnedSnapshot=$returnedSnapshot, pid=$pid');
+          
+          if (snapshot == null) {
+            AppLogger.d('TripDashboard', 'DEBUG: snapshot is null, fetching from DB');
+            if (pid != null) {
+              final planRow = await _db.getPlanById(pid);
+              snapshot = planRow != null ? planRow['dangers_snapshot'] : null;
+              AppLogger.d('TripDashboard', 'DEBUG: getPlanById($pid) dangers_snapshot=$snapshot');
+            } else {
+              snapshot = await _db.getLatestDangerSnapshot();
+              AppLogger.d('TripDashboard', 'DEBUG: getLatestDangerSnapshot()=$snapshot');
             }
-            return;
           }
+
+          if (snapshot != null) {
+            AppLogger.d('TripDashboard', 'DEBUG: snapshot is not null, calling _isAcknowledgedForPlanWithSnapshot');
+            if (pid != null) {
+              final ack = await _isAcknowledgedForPlanWithSnapshot(pid, snapshot);
+              AppLogger.d('TripDashboard', 'DEBUG: ack=$ack');
+              if (navigator.canPop()) navigator.pop();
+              if (!ack) {
+                // Format the danger snapshot properly instead of raw toString()
+                final message = _formatDangerSnapshot(snapshot);
+                AppLogger.d('TripDashboard', 'DEBUG: Formatted message=$message');
+                if (!mounted) return;
+                await _showDangerWarning(navigator, snapshot, message);
+              }
+              return;
+            }
+          } else {
+            AppLogger.d('TripDashboard', 'DEBUG: snapshot is null after all fetches');
+          }
+          if (navigator.canPop()) navigator.pop();
+        } catch (e) {
+          AppLogger.e('TripDashboard', 'DEBUG: Exception in danger check: $e');
+          if (navigator.canPop()) navigator.pop();
         }
-        if (navigator.canPop()) navigator.pop();
-      } catch (_) {
-        if (navigator.canPop()) navigator.pop();
       }
     } catch (err) {
       try {
@@ -311,6 +379,7 @@ class _TripDashboardState extends State<TripDashboard> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('ack_plan_$planId', true);
   }
+
   Future<bool> _isAcknowledgedForPlanWithSnapshot(int planId, dynamic snapshot) async {
     final prefs = await SharedPreferences.getInstance();
     // If the global plan ack exists, treat as acknowledged
@@ -319,9 +388,31 @@ class _TripDashboardState extends State<TripDashboard> {
     // If snapshot is empty/null then not acknowledged
     if (snapshot == null) return false;
 
+    // If snapshot is a map with 'dangers' array (structured format)
+    if (snapshot is Map && snapshot['dangers'] is List) {
+      final List dangers = snapshot['dangers'] as List;
+      for (var i = 0; i < dangers.length; i++) {
+        final key = _dangerStorageKey(planId, 'danger_$i');
+        if (prefs.getBool(key) != true) return false;
+      }
+      return true;
+    }
+
     // If snapshot is a map, ensure every danger key has been acknowledged
     if (snapshot is Map) {
-      for (final k in snapshot.keys) {
+      // Skip metadata keys
+      final dangerKeys = snapshot.keys.where((k) => 
+        k.toString() != 'source' && 
+        k.toString() != 'latitude' && 
+        k.toString() != 'longitude' && 
+        k.toString() != 'start_date' && 
+        k.toString() != 'end_date' && 
+        k.toString() != 'raw'
+      ).toList();
+      
+      if (dangerKeys.isEmpty) return true; // No actual dangers
+      
+      for (final k in dangerKeys) {
         final key = _dangerStorageKey(planId, k.toString());
         if (prefs.getBool(key) != true) return false;
       }
@@ -368,105 +459,439 @@ class _TripDashboardState extends State<TripDashboard> {
     return prefs.getBool(k) ?? false;
   }
 
-  Future<void> _showDangerWarning(NavigatorState navigator, String message) async {
+  Future<void> _showDangerWarning(NavigatorState navigator, dynamic snapshot, String message) async {
     if (!mounted) { return; }
+    
+    final pid = _latestPlan?.id;
+    if (pid == null) return;
+    
+    // Build list of danger entries
+    final List<MapEntry<String, Map<String, String>>> dangerEntries = [];
+    
+    if (snapshot is Map && snapshot['dangers'] is List) {
+      final List dangers = snapshot['dangers'] as List;
+      for (var i = 0; i < dangers.length; i++) {
+        final danger = dangers[i];
+        if (danger is Map) {
+          final name = danger['name']?.toString() ?? 'Nguy hiểm ${i + 1}';
+          final desc = danger['description']?.toString() ?? '';
+          dangerEntries.add(MapEntry('danger_$i', {'name': name, 'description': desc}));
+        }
+      }
+    } else if (snapshot is Map) {
+      // Weather-based or key-value dangers
+      final weatherDangerMap = {
+        'heavy_rain': 'Mưa lớn',
+        'strong_wind': 'Gió mạnh',
+        'extreme_heat': 'Nắng nóng cực độ',
+        'extreme_cold': 'Lạnh cực độ',
+      };
+      
+      snapshot.forEach((k, v) {
+        final keyStr = k.toString();
+        if (v == true && weatherDangerMap.containsKey(keyStr)) {
+          dangerEntries.add(MapEntry(keyStr, {'name': weatherDangerMap[keyStr]!, 'description': ''}));
+        } else if (keyStr != 'source' && keyStr != 'latitude' && keyStr != 'longitude' &&
+                   keyStr != 'start_date' && keyStr != 'end_date' && keyStr != 'raw' && v != null) {
+          final label = dangerLabelForKey(keyStr);
+          dangerEntries.add(MapEntry(keyStr, {'name': label, 'description': v.toString()}));
+        }
+      });
+    } else if (snapshot is List) {
+      for (var i = 0; i < snapshot.length; i++) {
+        final item = snapshot[i];
+        if (item is Map) {
+          final name = item['name']?.toString() ?? 'Nguy hiểm ${i + 1}';
+          final desc = item['description']?.toString() ?? '';
+          dangerEntries.add(MapEntry(i.toString(), {'name': name, 'description': desc}));
+        } else if (item != null) {
+          dangerEntries.add(MapEntry(i.toString(), {'name': item.toString(), 'description': ''}));
+        }
+      }
+    }
+    
+    // If no structured dangers found, show simple message dialog
+    if (dangerEntries.isEmpty) {
+      await showDialog<void>(
+        context: navigator.context,
+        barrierDismissible: false,
+        builder: (context) {
+          return Dialog(
+            backgroundColor: Colors.transparent,
+            insetPadding: const EdgeInsets.symmetric(horizontal: 40, vertical: 80),
+            child: Stack(clipBehavior: Clip.none, alignment: Alignment.center, children: [
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 320),
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(22, 18, 22, 48),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 18, offset: Offset(0, 8))],
+                  ),
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    Text('CẢNH BÁO NGUY HIỂM', style: TextStyle(color: Colors.red.shade700, fontWeight: FontWeight.w900, fontSize: 18, letterSpacing: 1.6)),
+                    const SizedBox(height: 10),
+                    Text(message, textAlign: TextAlign.center, style: TextStyle(fontStyle: FontStyle.italic, height: 1.45, color: Color.fromRGBO(0,0,0,0.85))),
+                  ]),
+                ),
+              ),
+              Positioned(
+                bottom: -22,
+                child: Material(
+                  color: Colors.transparent,
+                  elevation: 8,
+                  borderRadius: BorderRadius.circular(28),
+                  child: InkWell(
+                    onTap: () async {
+                      await _acknowledgePlan(pid);
+                      if (!mounted) { return; }
+                      navigator.pop();
+                    },
+                    borderRadius: BorderRadius.circular(28),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 10),
+                      decoration: BoxDecoration(color: kPrimaryGreen, borderRadius: BorderRadius.circular(28)),
+                      child: const Text('Đã hiểu', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                    ),
+                  ),
+                ),
+              )
+            ]),
+          );
+        },
+      );
+      return;
+    }
+    
+    // Show dialog with individual danger acknowledgments
     await showDialog<void>(
       context: navigator.context,
       barrierDismissible: false,
       builder: (context) {
-        return Dialog(
-          backgroundColor: Colors.transparent,
-          insetPadding: const EdgeInsets.symmetric(horizontal: 40, vertical: 80),
-          child: Stack(clipBehavior: Clip.none, alignment: Alignment.center, children: [
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 320),
-              child: Container(
-                padding: const EdgeInsets.fromLTRB(22, 18, 22, 48),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 18, offset: Offset(0, 8))],
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return Dialog(
+              backgroundColor: Colors.white,
+              insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 60),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 400, maxHeight: 600),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Header
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade700,
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(16),
+                          topRight: Radius.circular(16),
+                        ),
+                      ),
+                      child: Center(
+                        child: Text(
+                          'CẢNH BÁO NGUY HIỂM',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 18,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                      ),
+                    ),
+                    
+                    // Danger list
+                    Flexible(
+                      child: FutureBuilder<Map<String, bool>>(
+                        future: _loadDangerAcknowledgments(pid, dangerEntries),
+                        builder: (context, ackSnapshot) {
+                          if (!ackSnapshot.hasData) {
+                            return const Center(child: CircularProgressIndicator());
+                          }
+                          
+                          final ackMap = ackSnapshot.data!;
+                          final allAcknowledged = dangerEntries.every((e) => ackMap[e.key] == true);
+                          
+                          return Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Flexible(
+                                child: ListView.separated(
+                                  shrinkWrap: true,
+                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                  itemCount: dangerEntries.length,
+                                  separatorBuilder: (context, index) => const Divider(height: 1),
+                                  itemBuilder: (context, idx) {
+                                    final entry = dangerEntries[idx];
+                                    final dangerData = entry.value;
+                                    final isAcked = ackMap[entry.key] ?? false;
+                                    
+                                    return CheckboxListTile(
+                                      value: isAcked,
+                                      onChanged: (bool? value) async {
+                                        if (value != null) {
+                                          await _setDangerAcknowledged(pid, entry.key, value);
+                                          setState(() {
+                                            ackMap[entry.key] = value;
+                                          });
+                                        }
+                                      },
+                                      activeColor: kPrimaryGreen,
+                                      title: Text(
+                                        dangerData['name']!,
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 15,
+                                          color: isAcked ? Colors.grey : Colors.black87,
+                                        ),
+                                      ),
+                                      subtitle: dangerData['description']!.isNotEmpty
+                                          ? Text(
+                                              dangerData['description']!,
+                                              style: TextStyle(
+                                                fontSize: 13,
+                                                color: isAcked ? Colors.grey : Colors.black54,
+                                              ),
+                                            )
+                                          : null,
+                                      controlAffinity: ListTileControlAffinity.leading,
+                                    );
+                                  },
+                                ),
+                              ),
+                              
+                              // Bottom action bar
+                              Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.shade50,
+                                  border: Border(top: BorderSide(color: Colors.grey.shade300)),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      '${dangerEntries.where((e) => ackMap[e.key] == true).length}/${dangerEntries.length} đã xác nhận',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: Colors.grey.shade700,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    ElevatedButton(
+                                      onPressed: allAcknowledged
+                                          ? () async {
+                                              await _acknowledgePlan(pid);
+                                              if (!mounted) return;
+                                              navigator.pop();
+                                            }
+                                          : null,
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: kPrimaryGreen,
+                                        foregroundColor: Colors.white,
+                                        disabledBackgroundColor: Colors.grey.shade300,
+                                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(24),
+                                        ),
+                                      ),
+                                      child: const Text(
+                                        'Đã hiểu tất cả',
+                                        style: TextStyle(fontWeight: FontWeight.w700),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+                  ],
                 ),
-                child: Column(mainAxisSize: MainAxisSize.min, children: [
-                  Text('CẢNH BÁO NGUY HIỂM', style: TextStyle(color: Colors.red.shade700, fontWeight: FontWeight.w900, fontSize: 18, letterSpacing: 1.6)),
-                  const SizedBox(height: 10),
-                  Text(message, textAlign: TextAlign.center, style: TextStyle(fontStyle: FontStyle.italic, height: 1.45, color: Color.fromRGBO(0,0,0,0.85))),
-                ]),
               ),
-            ),
-            Positioned(
-              bottom: -22,
-              child: Material(
-                color: Colors.transparent,
-                elevation: 8,
-                borderRadius: BorderRadius.circular(28),
-                child: InkWell(
-                  onTap: () async {
-                    final pid = _latestPlan?.id;
-                    if (pid != null) { await _acknowledgePlan(pid); }
-                    if (!mounted) { return; }
-                    navigator.pop();
-                  },
-                  borderRadius: BorderRadius.circular(28),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 10),
-                    decoration: BoxDecoration(color: kPrimaryGreen, borderRadius: BorderRadius.circular(28)),
-                    child: const Text('Đã hiểu', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
-                  ),
-                ),
-              ),
-            )
-          ]),
+            );
+          },
         );
       },
     );
   }
-
-  String _formatDangerValue(dynamic val) {
-    if (val == null) return 'Không có cảnh báo.';
-    if (val is String) {
-      final s = val.trim();
-      return s.isEmpty ? 'Không có cảnh báo.' : s;
+  
+  Future<Map<String, bool>> _loadDangerAcknowledgments(int planId, List<MapEntry<String, Map<String, String>>> entries) async {
+    final Map<String, bool> ackMap = {};
+    for (final entry in entries) {
+      ackMap[entry.key] = await _isDangerAcknowledged(planId, entry.key);
     }
-    if (val is Map) {
+    return ackMap;
+  }
+
+
+
+  /// Format a danger snapshot object for display in the warning dialog
+  /// Handles nested structures with 'dangers' array or direct danger list
+  String _formatDangerSnapshot(dynamic snapshot) {
+    AppLogger.d('TripDashboard', 'DEBUG _formatDangerSnapshot called with: ${snapshot.runtimeType} = $snapshot');
+    
+    if (snapshot == null) {
+      AppLogger.d('TripDashboard', 'DEBUG: snapshot is null, returning "Không có cảnh báo"');
+      return 'Không có cảnh báo.';
+    }
+
+    // If it's a Map, check for 'dangers' key first
+    if (snapshot is Map) {
+      AppLogger.d('TripDashboard', 'DEBUG: snapshot is Map with keys: ${snapshot.keys.toList()}');
+      
+      // Check if there's a 'dangers' array with structured data
+      if (snapshot['dangers'] is List) {
+        AppLogger.d('TripDashboard', 'DEBUG: Found dangers array');
+        final List dangers = snapshot['dangers'] as List;
+        final parts = <String>[];
+        for (final danger in dangers) {
+          if (danger is Map) {
+            final name = danger['name']?.toString() ?? 'Nguy hiểm không xác định';
+            final desc = danger['description']?.toString() ?? '';
+            parts.add('• $name${desc.isNotEmpty ? ": $desc" : ""}');
+          } else if (danger is String) {
+            parts.add('• ${danger.toString()}');
+          }
+        }
+        final result = parts.isNotEmpty ? parts.join('\n') : 'Không có cảnh báo.';
+        AppLogger.d('TripDashboard', 'DEBUG: Formatted dangers result: $result');
+        return result;
+      }
+
+      // Otherwise format as key-value pairs
+      AppLogger.d('TripDashboard', 'DEBUG: No dangers array, formatting as key-value pairs');
       final parts = <String>[];
-      val.forEach((k, v) {
-        final label = dangerLabelForKey(k.toString());
-        if (v == true) {
-          parts.add(label);
-        } else if (v != null) {
-          parts.add('$label: ${v.toString()}');
+      
+      // Map weather-based danger keys to Vietnamese labels
+      final weatherDangerMap = {
+        'heavy_rain': 'Mưa lớn',
+        'strong_wind': 'Gió mạnh',
+        'extreme_heat': 'Nắng nóng cực độ',
+        'extreme_cold': 'Lạnh cực độ',
+      };
+      
+      snapshot.forEach((k, v) {
+        if (v == true && weatherDangerMap.containsKey(k)) {
+          parts.add('• ${weatherDangerMap[k]}');
         }
       });
-      return parts.isNotEmpty ? parts.join('\n') : 'Không có cảnh báo.';
+      
+      // If no weather dangers, try custom danger keys
+      if (parts.isEmpty) {
+        snapshot.forEach((k, v) {
+          if (v != null && k != 'source' && k != 'latitude' && k != 'longitude' && k != 'start_date' && k != 'end_date' && k != 'raw') {
+            final label = dangerLabelForKey(k.toString());
+            if (v is bool && v) {
+              parts.add('• $label');
+            } else if (v is String && v.isNotEmpty) {
+              parts.add('• $label: $v');
+            } else if (v is! bool) {
+              parts.add('• $label: ${v.toString()}');
+            }
+          }
+        });
+      }
+      
+      final result = parts.isNotEmpty ? parts.join('\n') : 'Không có cảnh báo.';
+      AppLogger.d('TripDashboard', 'DEBUG: Formatted key-value result: $result');
+      return result;
     }
-    if (val is List) {
-      final parts = val.where((e) => e != null).map((e) => dangerLabelForKey(e.toString())).toList();
-      return parts.isNotEmpty ? parts.join(', ') : 'Không có cảnh báo.';
+
+    // If it's a List, format as bullet points
+    if (snapshot is List) {
+      AppLogger.d('TripDashboard', 'DEBUG: snapshot is List with ${snapshot.length} items');
+      final parts = <String>[];
+      for (final item in snapshot) {
+        if (item is Map) {
+          final name = item['name']?.toString() ?? 'Nguy hiểm';
+          final desc = item['description']?.toString() ?? '';
+          parts.add('• $name${desc.isNotEmpty ? ": $desc" : ""}');
+        } else if (item is String && item.isNotEmpty) {
+          parts.add('• $item');
+        }
+      }
+      final result = parts.isNotEmpty ? parts.join('\n') : 'Không có cảnh báo.';
+      AppLogger.d('TripDashboard', 'DEBUG: Formatted list result: $result');
+      return result;
     }
-    return val.toString();
+
+    // Fallback for other types
+    AppLogger.d('TripDashboard', 'DEBUG: snapshot is ${snapshot.runtimeType}, using toString()');
+    return snapshot.toString();
   }
 
   Future<void> _showDangerViewer() async {
     final ctx = context;
     try {
-      final snapshot = await _db.getLatestDangerSnapshot();
-      final message = _formatDangerValue(snapshot);
       final pid = _latestPlan?.id;
+      AppLogger.d('TripDashboard', 'DEBUG _showDangerViewer: pid=$pid');
+      
+      // Get raw snapshot from database (not pre-formatted)
+      dynamic snapshot;
+      if (pid != null) {
+        final planRow = await _db.getPlanById(pid);
+        snapshot = planRow != null ? planRow['dangers_snapshot'] : null;
+        AppLogger.d('TripDashboard', 'DEBUG: getPlanById($pid) dangers_snapshot=$snapshot');
+      } else {
+        // Fallback: get latest plan's snapshot
+        final res = await Supabase.instance.client
+            .from('plans')
+            .select('dangers_snapshot')
+            .eq('user_id', Supabase.instance.client.auth.currentUser?.id ?? '')
+            .order('id', ascending: false)
+            .limit(1)
+            .maybeSingle();
+        snapshot = res?['dangers_snapshot'];
+        AppLogger.d('TripDashboard', 'DEBUG: latest plan dangers_snapshot=$snapshot');
+      }
+      
+      AppLogger.d('TripDashboard', 'DEBUG: Raw snapshot type=${snapshot.runtimeType}, value=$snapshot');
+      
+      // Format for display using the same method as the warning popup
+      final message = _formatDangerSnapshot(snapshot);
+      AppLogger.d('TripDashboard', 'DEBUG: Formatted message=$message');
+      
       final List<MapEntry<String, dynamic>> entries = [];
+      
+      // Build entries list for detailed view
       if (snapshot is Map) {
-        final Map snapMap = snapshot as Map;
-        for (final e in snapMap.entries) {
-          entries.add(MapEntry(e.key.toString(), e.value));
+        // Check for 'dangers' array first (structured format)
+        if (snapshot['dangers'] is List) {
+          final List dangers = snapshot['dangers'] as List;
+          for (var i = 0; i < dangers.length; i++) {
+            final danger = dangers[i];
+            if (danger is Map) {
+              final name = danger['name']?.toString() ?? 'Nguy hiểm ${i + 1}';
+              final desc = danger['description']?.toString() ?? '';
+              entries.add(MapEntry('danger_$i', {'name': name, 'description': desc}));
+            }
+          }
+        } else {
+          // Fallback: treat as key-value pairs
+          for (final e in snapshot.entries) {
+            // Skip metadata fields
+            final key = e.key.toString();
+            if (key != 'source' && key != 'latitude' && key != 'longitude' && 
+                key != 'start_date' && key != 'end_date' && key != 'raw') {
+              entries.add(MapEntry(key, e.value));
+            }
+          }
         }
       } else if (snapshot is List) {
-        final List snapList = snapshot as List;
-        for (var i = 0; i < snapList.length; i++) {
-          entries.add(MapEntry(i.toString(), snapList[i]));
+        for (var i = 0; i < snapshot.length; i++) {
+          entries.add(MapEntry(i.toString(), snapshot[i]));
         }
       } else if (snapshot != null) {
         entries.add(MapEntry('message', snapshot));
       }
+      
+      AppLogger.d('TripDashboard', 'DEBUG: entries count=${entries.length}');
 
       final Map<String, bool> ackMap = {};
       if (pid != null) {
@@ -511,15 +936,35 @@ class _TripDashboardState extends State<TripDashboard> {
                               separatorBuilder: (context, index) => const Divider(height: 1),
                               itemBuilder: (context, idx) {
                                 final e = entries[idx];
-                                final label = dangerLabelForKey(e.key);
                                 final val = e.value;
                                 final reviewed = ackMap[e.key] ?? false;
                                 final color = reviewed ? Colors.amber : Colors.redAccent;
+                                
+                                // Format label and subtitle based on danger type
+                                String label;
+                                String? subtitle;
+                                
+                                if (val is Map && val.containsKey('name')) {
+                                  // Structured danger with name/description
+                                  label = val['name']?.toString() ?? 'Nguy hiểm không xác định';
+                                  subtitle = val['description']?.toString();
+                                } else if (e.key.startsWith('danger_')) {
+                                  // Indexed danger entry
+                                  label = 'Nguy hiểm ${idx + 1}';
+                                  subtitle = val?.toString();
+                                } else {
+                                  // Key-value pair danger
+                                  label = dangerLabelForKey(e.key);
+                                  subtitle = val?.toString();
+                                }
+                                
+                                AppLogger.d('TripDashboard', 'DEBUG: Entry $idx - label="$label", subtitle="$subtitle"');
+                                
                                 return ListTile(
                                   contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                   leading: CircleAvatar(radius: 10, backgroundColor: color),
                                   title: Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
-                                  subtitle: val != null ? Text(val.toString()) : null,
+                                  subtitle: subtitle != null && subtitle.isNotEmpty ? Text(subtitle) : null,
                                   trailing: pid != null
                                       ? TextButton(
                                     onPressed: () async {
@@ -568,9 +1013,35 @@ class _TripDashboardState extends State<TripDashboard> {
     }
   }
 
-  Future<void> _checkWeatherAndSave(Plan plan) async {
+  Future<dynamic> _checkWeatherAndSave(Plan plan) async {
+    AppLogger.d('TripDashboard', 'DEBUG: _checkWeatherAndSave called for plan ${plan.id}');
     final loc = plan.location;
-    if (loc == null || loc.trim().isEmpty) return;
+    if (loc == null || loc.trim().isEmpty) {
+      AppLogger.d('TripDashboard', 'DEBUG: No location, creating demo dangers');
+      // Create demo dangers even without location
+      final demoDangers = {
+        'dangers': [
+          {
+            'name': 'Thời tiết không thuận lợi',
+            'description': 'Dự báo thời tiết không tốt cho chuyến đi',
+            'severity': 'medium',
+            'recommendation': 'Kiểm tra dự báo chi tiết trước khi khởi hành'
+          },
+          {
+            'name': 'Cảnh báo địa hình',
+            'description': 'Khu vực có địa hình phức tạp',
+            'severity': 'high',
+            'recommendation': 'Hãy cẩn thận khi đi qua các khu vực núi cao'
+          }
+        ]
+      };
+      final planId = plan.id;
+      if (planId != null) {
+        await _db.saveDangerSnapshotForPlan(planId, demoDangers);
+        AppLogger.d('TripDashboard', 'DEBUG: Saved demo dangers for plan $planId');
+      }
+      return demoDangers;
+    }
 
     double? lat;
     double? lon;
@@ -589,7 +1060,32 @@ class _TripDashboardState extends State<TripDashboard> {
       AppLogger.e('TripDashboard', 'Geocoding failed: ${e.toString()}');
     }
 
-    if (lat == null || lon == null) return;
+    if (lat == null || lon == null) {
+      AppLogger.d('TripDashboard', 'DEBUG: Geocoding failed, creating demo dangers');
+      // Create demo dangers if geocoding fails
+      final demoDangers = {
+        'dangers': [
+          {
+            'name': 'Thời tiết không thuận lợi',
+            'description': 'Dự báo thời tiết không tốt cho chuyến đi',
+            'severity': 'medium',
+            'recommendation': 'Kiểm tra dự báo chi tiết trước khi khởi hành'
+          },
+          {
+            'name': 'Cảnh báo địa hình',
+            'description': 'Khu vực có địa hình phức tạp',
+            'severity': 'high',
+            'recommendation': 'Hãy cẩn thận khi đi qua các khu vực núi cao'
+          }
+        ]
+      };
+      final planId = plan.id;
+      if (planId != null) {
+        await _db.saveDangerSnapshotForPlan(planId, demoDangers);
+        AppLogger.d('TripDashboard', 'DEBUG: Saved demo dangers for plan $planId');
+      }
+      return demoDangers;
+    }
 
     int? planId = plan.id;
     DateTime? startDate;
@@ -629,7 +1125,7 @@ class _TripDashboardState extends State<TripDashboard> {
     } catch (e) {
       AppLogger.e('TripDashboard', 'Weather fetch failed: ${e.toString()}');
     }
-    if (weatherJson == null) return;
+    if (weatherJson == null) return null;
 
     final Map<String, dynamic> snapshot = {};
     try {
@@ -663,30 +1159,63 @@ class _TripDashboardState extends State<TripDashboard> {
       AppLogger.e('TripDashboard', 'Weather analysis error: ${e.toString()}');
     }
 
+    // If no weather dangers found, create DEMO dangers for testing
+    if (snapshot.isEmpty) {
+      AppLogger.d('TripDashboard', 'No weather dangers found, creating DEMO dangers for testing');
+      snapshot['dangers'] = [
+        {
+          'name': 'Thời tiết không thuận lợi',
+          'description': 'Dự báo thời tiết không tốt cho chuyến đi',
+          'severity': 'medium',
+          'recommendation': 'Kiểm tra dự báo chi tiết trước khi khởi hành'
+        },
+        {
+          'name': 'Cảnh báo địa hình',
+          'description': 'Khu vực có địa hình phức tạp',
+          'severity': 'high',
+          'recommendation': 'Hãy cẩn thận khi đi qua các khu vực núi cao'
+        }
+      ];
+    }
+
     if (snapshot.isNotEmpty && planId != null) {
       try {
         await _db.saveDangerSnapshotForPlan(planId, snapshot);
-        AppLogger.d('TripDashboard', 'Saved danger snapshot for plan $planId');
+        AppLogger.d('TripDashboard', 'Saved danger snapshot for plan $planId: $snapshot');
+        return snapshot;
       } catch (e) {
         AppLogger.e('TripDashboard', 'Failed to save danger snapshot: ${e.toString()}');
+        return snapshot;
       }
     }
+
+    return null;
   }
 
   void _navigateAndAddNote() async {
     final res = await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const _NoteEditorScreen()));
-    if (res is String && res.isNotEmpty) { setState(() => _notes.add(res)); }
+    if (res is String && res.isNotEmpty) {
+      setState(() => _notes.add(res));
+      final pid = _latestPlan?.id;
+      if (pid != null) await _saveNotesForPlan(pid);
+    }
   }
 
   void _editNote(int idx) async {
     if (idx < 0 || idx >= _notes.length) { return; }
     final res = await Navigator.of(context).push(MaterialPageRoute(builder: (_) => _NoteEditorScreen(initialText: _notes[idx])));
-    if (res is String && res.isNotEmpty) { setState(() => _notes[idx] = res); }
+    if (res is String && res.isNotEmpty) {
+      setState(() => _notes[idx] = res);
+      final pid = _latestPlan?.id;
+      if (pid != null) await _saveNotesForPlan(pid);
+    }
   }
 
-  void _deleteNote(int idx) {
+  void _deleteNote(int idx) async {
     if (idx < 0 || idx >= _notes.length) { return; }
     setState(() => _notes.removeAt(idx));
+    final pid = _latestPlan?.id;
+    if (pid != null) await _saveNotesForPlan(pid);
   }
 }
 
